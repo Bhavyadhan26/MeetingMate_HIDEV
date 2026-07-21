@@ -13,6 +13,8 @@ QDRANT_API_KEY=your-qdrant-cluster-api-key
 LYZR_API_KEY=your-lyzr-api-key
 LYZR_RAG_ID=your-lyzr-knowledge-base-id
 LYZR_RAG_COLLECTION=decisions
+LYZR_RAG_QUERY=What did we decide about Qdrant?
+LYZR_AGENT_ID=your-lyzr-agent-id-after-attaching-the-knowledge-base
 ```
 
 `docker-compose.yml` reads those values automatically. If they are absent, the backend uses the local Qdrant service at `http://qdrant:6333`.
@@ -52,7 +54,8 @@ In Lyzr Studio:
 6. Create a Knowledge Base or vector-backed resource from that connector.
 7. Select the `decisions` collection first.
 8. Attach the Knowledge Base to a Lyzr agent.
-9. Run queries such as:
+9. Copy the agent id into `LYZR_AGENT_ID` in `.env`.
+10. Run queries such as:
    - `What did we decide about Qdrant?`
    - `List conflicted decisions.`
    - `What active decisions exist for the platform team?`
@@ -69,9 +72,18 @@ Verify the saved Lyzr Knowledge Base/RAG config from the repo:
 
 ```bash
 python scripts/lyzr_rag_check.py
+python scripts/lyzr_rag_retrieve_check.py
 ```
 
-Expected result: `lyzr_rag_check` is `ok`, `vector_store_provider` contains `Qdrant`, and `collection_name` contains the configured `LYZR_RAG_COLLECTION` value. This confirms the Lyzr Studio side is connected to the Qdrant-backed MeetingMate memory. To produce inspectable Lyzr Studio traces, attach that Knowledge Base to a Lyzr agent and invoke the agent in Studio.
+Expected result: `lyzr_rag_check` is `ok`, `vector_store_provider` contains `Qdrant`, and `collection_name` contains the configured `LYZR_RAG_COLLECTION` value. `lyzr_rag_retrieve_check` should also return at least one result for the configured query. Together, these confirm the Lyzr Studio side is connected to populated Qdrant-backed MeetingMate memory.
+
+Verify a real Lyzr Studio agent invocation against that Knowledge Base:
+
+```bash
+python scripts/lyzr_agent_check.py
+```
+
+Expected result: `lyzr_agent_check` is `ok`, the output includes a generated `session_id`, and the same session can be inspected in Lyzr Studio monitoring or agent chat history. This command requires `LYZR_AGENT_ID`; it intentionally fails if no Studio agent is attached yet.
 
 ## OTLP Endpoint
 

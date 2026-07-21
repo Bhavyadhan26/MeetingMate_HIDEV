@@ -73,6 +73,13 @@ To verify a Lyzr Studio Knowledge Base/RAG config that points at Qdrant, set `LY
 
 ```bash
 python scripts/lyzr_rag_check.py
+python scripts/lyzr_rag_retrieve_check.py
+```
+
+To verify an actual Lyzr Studio agent run against that Knowledge Base, attach the Knowledge Base to a Studio agent, set `LYZR_AGENT_ID`, and run:
+
+```bash
+python scripts/lyzr_agent_check.py
 ```
 
 To submit a full pipeline trace to a real Lyzr OTLP collector, set the Lyzr endpoint and auth values in the backend container environment, then run:

@@ -80,9 +80,18 @@ Expected result: JSON output includes a request with `path` `/v1/traces`, `conte
 
 ```bash
 python scripts/lyzr_rag_check.py
+python scripts/lyzr_rag_retrieve_check.py
 ```
 
-Expected result: JSON output includes `lyzr_rag_check: ok`, the Qdrant vector store provider, and the configured decisions collection.
+Expected result: JSON output includes `lyzr_rag_check: ok`, the Qdrant vector store provider, the configured decisions collection, and `lyzr_rag_retrieve_check: ok` with at least one result.
+
+12. If a Lyzr Studio agent has the Knowledge Base attached, verify an actual Studio-side run:
+
+```bash
+python scripts/lyzr_agent_check.py
+```
+
+Expected result: JSON output includes `lyzr_agent_check: ok` and a `session_id` that can be opened in Lyzr Studio monitoring or agent chat history.
 
 To submit the same kind of full pipeline trace to a real Lyzr OTLP collector, set `LYZR_OTLP_ENDPOINT` and either `LYZR_API_KEY` or `LYZR_OTLP_HEADERS` in the backend container, then run:
 
@@ -92,7 +101,7 @@ docker compose exec backend python -m backend.app.observability.lyzr_live_trace_
 
 Expected result: JSON output includes `lyzr_live_trace_check: submitted`, a trace id, and the agent list to verify in Lyzr Studio. Skip this when your Lyzr workspace does not expose an external OTLP endpoint.
 
-12. Confirm Qdrant contains decisions:
+13. Confirm Qdrant contains decisions:
 
 ```bash
 curl http://localhost:6333/collections/decisions
