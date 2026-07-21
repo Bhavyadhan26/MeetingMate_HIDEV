@@ -76,6 +76,14 @@ docker compose exec backend python -m backend.app.observability.pipeline_otlp_sm
 
 Expected result: JSON output includes a request with `path` `/v1/traces`, `content_type` `application/x-protobuf`, and non-zero `content_length`; the pipeline smoke also lists `manager`, `summarizer`, `action_item_extractor`, `decision_extractor`, and `decision_drift_agent`.
 
+To submit the same kind of full pipeline trace to a real Lyzr tenant, set `LYZR_OTLP_ENDPOINT` and either `LYZR_API_KEY` or `LYZR_OTLP_HEADERS` in the backend container, then run:
+
+```bash
+docker compose exec backend python -m backend.app.observability.lyzr_live_trace_check
+```
+
+Expected result: JSON output includes `lyzr_live_trace_check: submitted`, a trace id, and the agent list to verify in Lyzr Studio.
+
 11. Confirm Qdrant contains decisions:
 
 ```bash

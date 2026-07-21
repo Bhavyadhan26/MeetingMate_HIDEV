@@ -36,6 +36,7 @@ container ADK detection -> ADKRuntimeStatus(available=True, detail='google.adk i
 container ADK graph smoke -> manager trace emitted adk_graph_finish for meeting_intelligence_adk_manager / parallel_extraction_swarm
 container OTLP smoke -> python -m backend.app.observability.otlp_smoke emitted trace-51bc9d3e7ca5 and local receiver captured POST /v1/traces content_type=application/x-protobuf content_length=387
 container pipeline OTLP smoke -> python -m backend.app.observability.pipeline_otlp_smoke emitted trace-fcb722b66045 with orchestration `adk parallel extraction, sequential drift write`, agent events for action_item_extractor, decision_drift_agent, decision_extractor, manager, and summarizer, plus a protobuf POST to `/v1/traces` with content_length=3234
+live Lyzr tenant check -> `python -m backend.app.observability.lyzr_live_trace_check` submits a full pipeline trace to the configured `LYZR_OTLP_ENDPOINT` and requires `LYZR_API_KEY` or `LYZR_OTLP_HEADERS`; without tenant credentials, this remains the only external manual verification step
 live HTTP ingest trace -> orchestration='adk parallel extraction, sequential drift write'
 POST /v1/transcripts first meeting -> active decision persisted through Qdrant
 POST /v1/transcripts reversal -> Potential Conflict with prior_decision_id

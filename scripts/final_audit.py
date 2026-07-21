@@ -40,6 +40,7 @@ REQUIRED_PATHS = (
     "backend/app/services",
     "backend/app/models",
     "backend/app/observability",
+    "backend/app/observability/lyzr_live_trace_check.py",
     "backend/tests",
     "backend/requirements.txt",
     "frontend/src/components",
@@ -51,6 +52,7 @@ REQUIRED_PATHS = (
     "scripts/demo_walkthrough.py",
     "scripts/fresh_clone_audit.py",
     "scripts/check_no_secrets_tracked.py",
+    "scripts/lyzr_live_trace_check.py",
 )
 README_TERMS = (
     "Decision Decay",

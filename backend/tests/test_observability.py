@@ -1,7 +1,11 @@
+import io
+import json
 import os
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import patch
 
+from backend.app.observability.lyzr_live_trace_check import main as lyzr_live_trace_check_main
 from backend.app.observability.otlp_smoke import has_otlp_exporter, run_otlp_smoke
 from backend.app.observability.tracing import _otlp_headers
 
@@ -28,6 +32,20 @@ class ObservabilityTests(unittest.TestCase):
         self.assertGreaterEqual(len(result["requests"]), 1)
         self.assertEqual(result["requests"][0]["path"], "/v1/traces")
         self.assertGreater(result["requests"][0]["content_length"], 0)
+
+    def test_live_lyzr_trace_check_reports_missing_endpoint_as_json(self) -> None:
+        with patch.dict(os.environ, {
+            "LYZR_OTLP_ENDPOINT": "",
+            "LYZR_API_KEY": "",
+            "LYZR_OTLP_HEADERS": "",
+        }, clear=False):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = lyzr_live_trace_check_main()
+        self.assertEqual(exit_code, 2)
+        payload = json.loads(output.getvalue())
+        self.assertEqual(payload["lyzr_live_trace_check"], "not_submitted")
+        self.assertIn("LYZR_OTLP_ENDPOINT", payload["error"])
 
 
 if __name__ == "__main__":

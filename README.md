@@ -67,6 +67,14 @@ docker compose exec backend python -m backend.app.observability.pipeline_otlp_sm
 
 Use `LYZR_OTLP_ENDPOINT` for the collector URL. Set `LYZR_API_KEY` for bearer auth, or `LYZR_OTLP_HEADERS` for JSON or comma-separated header values when the target collector requires custom headers.
 
+To submit a full pipeline trace to a real Lyzr tenant, set the Lyzr endpoint and auth values in the backend container environment, then run:
+
+```bash
+docker compose exec backend python -m backend.app.observability.lyzr_live_trace_check
+```
+
+The command prints the trace id and expected service name (`meetingmate-agent-swarm`) to inspect in Lyzr Studio.
+
 To require a live Qdrant check:
 
 ```bash

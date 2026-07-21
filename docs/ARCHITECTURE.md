@@ -17,6 +17,8 @@ The external documentation used for alignment is current as of 2026-07-21: Googl
 
 The local mode is intentionally deterministic so the phase gates can be tested without API keys. Production deployment should set `MEMORY_BACKEND=qdrant` and export traces to Lyzr via `LYZR_OTLP_ENDPOINT`. OTLP authentication can be supplied with either `LYZR_API_KEY` for a bearer token or `LYZR_OTLP_HEADERS` for JSON/key-value headers required by the target collector.
 
+`scripts/lyzr_live_trace_check.py` is the real-tenant verification hook: it refuses to run without `LYZR_OTLP_ENDPOINT` and either `LYZR_API_KEY` or `LYZR_OTLP_HEADERS`, submits a full meeting pipeline trace, then prints the trace id and `meetingmate-agent-swarm` service name for Lyzr Studio inspection.
+
 ## Integration Modes
 
 | Mode | Environment | Evidence |
