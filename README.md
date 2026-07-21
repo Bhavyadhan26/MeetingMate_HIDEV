@@ -113,6 +113,12 @@ set FINAL_AUDIT_LIVE=1
 python scripts/final_audit.py
 ```
 
+To prove the README path from a fresh clone on alternate local ports:
+
+```bash
+python scripts/fresh_clone_audit.py
+```
+
 ## Known Limitations
 
 The repository currently ships an offline-verifiable MVP plus live Qdrant, ADK, and OTLP tracing adapters. Local tests run without cloud credentials by using deterministic adapters; the Docker demo uses Qdrant as the active memory backend and ADK for extraction orchestration. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.

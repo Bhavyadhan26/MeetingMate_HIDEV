@@ -49,6 +49,7 @@ REQUIRED_PATHS = (
     "scripts/seed_demo_data.py",
     "scripts/run_eval.py",
     "scripts/demo_walkthrough.py",
+    "scripts/fresh_clone_audit.py",
     "scripts/check_no_secrets_tracked.py",
 )
 README_TERMS = (

@@ -1,4 +1,4 @@
-const API = "http://localhost:8000";
+const API = window.MEETINGMATE_API_BASE || "http://localhost:8000";
 
 async function request(path, options = {}) {
   const response = await fetch(`${API}${path}`, options);

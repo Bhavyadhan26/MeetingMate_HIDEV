@@ -113,12 +113,18 @@ def request_absolute(method: str, url: str, payload: dict | None = None) -> dict
         method=method,
         headers={"Content-Type": "application/json"} if payload is not None else {},
     )
-    try:
-        with urllib.request.urlopen(request_obj, timeout=30) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8")
-        raise RuntimeError(f"{method} {url} returned {exc.code}: {detail}") from exc
+    last_error: Exception | None = None
+    for _ in range(5):
+        try:
+            with urllib.request.urlopen(request_obj, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8")
+            raise RuntimeError(f"{method} {url} returned {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            last_error = exc
+            time.sleep(2)
+    raise RuntimeError(f"{method} {url} failed after retries: {last_error}")
 
 
 if __name__ == "__main__":
