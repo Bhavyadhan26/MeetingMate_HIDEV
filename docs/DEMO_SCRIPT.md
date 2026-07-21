@@ -30,6 +30,14 @@ What did we decide about Qdrant?
 
 Expected result: the recall answer cites the relevant source excerpts.
 
-7. Inspect `backend/app/observability/local_traces.jsonl`.
+7. Inspect `backend/app/observability/local_traces.jsonl` in local mode, or the configured OTLP/Lyzr sink when `LYZR_OTLP_ENDPOINT` is set.
 
 Expected result: trace records exist for manager, summarizer, action item extractor, decision extractor, decision drift, and recall.
+
+8. Confirm Qdrant contains decisions:
+
+```bash
+curl http://localhost:6333/collections/decisions
+```
+
+Expected result: `points_count` increases after processing meetings.

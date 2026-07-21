@@ -26,6 +26,14 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn("+1 415 555 1212", redacted)
         self.assertEqual(redacted.count(mapping["Asha Rao"]), 2)
 
+    def test_redaction_maps_first_name_alias_to_same_placeholder(self) -> None:
+        redacted, mapping = redact_pii("Marco Lee joined. Marco will prepare the checklist.", ["Marco Lee"])
+        self.assertNotIn("Marco", redacted)
+        self.assertNotIn("Marco Lee", redacted)
+        self.assertEqual(mapping["Marco Lee"], mapping["Marco"])
+        self.assertEqual(mapping["Marco Lee"], "[PERSON_1]")
+        self.assertEqual(redacted.count(mapping["Marco Lee"]), 2)
+
     def test_pipeline_flags_second_meeting_conflict(self) -> None:
         first = self.pipeline.process(
             "Architecture sync",

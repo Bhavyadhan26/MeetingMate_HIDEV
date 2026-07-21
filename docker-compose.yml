@@ -12,7 +12,7 @@ services:
       context: ./backend
     environment:
       APP_ENV: local
-      MEMORY_BACKEND: local
+      MEMORY_BACKEND: qdrant
       QDRANT_URL: http://qdrant:6333
       LOCAL_MEMORY_PATH: /workspace/backend/app/memory/local_ledger.json
       TRACE_OUTPUT_PATH: /workspace/backend/app/observability/local_traces.jsonl

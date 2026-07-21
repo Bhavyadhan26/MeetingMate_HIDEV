@@ -48,6 +48,8 @@ Backend: `http://localhost:8000`
 Frontend: `http://localhost:5173`  
 Qdrant: `http://localhost:6333`
 
+The compose stack runs the backend with `MEMORY_BACKEND=qdrant`, so Qdrant is load-bearing in the demo path.
+
 Run integration smoke checks:
 
 ```bash
@@ -82,7 +84,7 @@ The latest verified output is recorded in [docs/EVAL.md](docs/EVAL.md).
 
 ## Known Limitations
 
-The repository currently ships an offline-verifiable MVP plus optional live adapters for Qdrant and OTLP tracing. Local tests run without cloud credentials by using deterministic adapters. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
+The repository currently ships an offline-verifiable MVP plus live Qdrant and OTLP tracing adapters. Local tests run without cloud credentials by using deterministic adapters; the Docker demo uses Qdrant as the active memory backend. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
 
 ## Project Structure
 

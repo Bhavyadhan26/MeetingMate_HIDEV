@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
 from uuid import NAMESPACE_URL, uuid5
@@ -89,12 +90,22 @@ class QdrantVectorMemory:
 
         self._models = __import__("qdrant_client.models", fromlist=["models"])
         self.client = QdrantClient(url=url, api_key=api_key or None)
+        last_error: Optional[Exception] = None
         for collection in (DECISIONS_COLLECTION, ACTION_ITEMS_COLLECTION, MEETING_CHUNKS_COLLECTION):
-            if not self.client.collection_exists(collection):
-                self.client.create_collection(
-                    collection_name=collection,
-                    vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
-                )
+            for _ in range(12):
+                try:
+                    if not self.client.collection_exists(collection):
+                        self.client.create_collection(
+                            collection_name=collection,
+                            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+                        )
+                    last_error = None
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    time.sleep(1)
+            if last_error is not None:
+                raise RuntimeError(f"Could not initialize Qdrant collection {collection}: {last_error}") from last_error
 
     @staticmethod
     def _point_id(decision_id: str) -> str:

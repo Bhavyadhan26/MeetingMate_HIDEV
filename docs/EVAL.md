@@ -26,3 +26,16 @@ Known evaluation limitation: the current extractor is deterministic and conserva
 ## Integration Smoke
 
 `scripts/smoke_integrations.py` verifies local memory, ADK runtime detection, local trace emission, and optionally live Qdrant. Live Qdrant is opt-in with `SMOKE_QDRANT=1` so CI can still run without Docker.
+
+Latest live stack verification:
+
+```text
+docker compose build -> backend image built successfully
+docker compose up -d --build backend -> backend and Qdrant running
+container ADK detection -> ADKRuntimeStatus(available=True, detail='google.adk import succeeded', version='1.0.0')
+POST /v1/transcripts first meeting -> active decision persisted through Qdrant
+POST /v1/transcripts reversal -> Potential Conflict with prior_decision_id
+POST /v1/decisions/{id}/resolve -> status resolved
+GET /v1/memory/search -> cited active and resolved decisions
+UI verification -> process, conflict display, resolve, and search all rendered correctly
+```
