@@ -34,7 +34,15 @@ Expected result: the recall answer cites the relevant source excerpts.
 
 Expected result: trace records exist for manager, summarizer, action item extractor, decision extractor, decision drift, and recall.
 
-8. Confirm Qdrant contains decisions:
+8. Verify the OTLP exporter path from inside the backend container:
+
+```bash
+docker compose exec backend python -m backend.app.observability.otlp_smoke
+```
+
+Expected result: JSON output includes a request with `path` `/v1/traces`, `content_type` `application/x-protobuf`, and non-zero `content_length`.
+
+9. Confirm Qdrant contains decisions:
 
 ```bash
 curl http://localhost:6333/collections/decisions

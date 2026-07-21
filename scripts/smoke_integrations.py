@@ -12,6 +12,7 @@ from backend.app.agents.adk_runtime import detect_adk_runtime
 from backend.app.memory.vector_store import LocalVectorMemory, QdrantVectorMemory
 from backend.app.models.schemas import Decision
 from backend.app.observability import trace_event
+from backend.app.observability.otlp_smoke import run_otlp_smoke
 from backend.app.services.pipeline import MeetingPipeline
 
 
@@ -74,6 +75,11 @@ def smoke_adk() -> None:
 def smoke_trace() -> None:
     trace_id = trace_event("smoke", "integration", {"component": "script"})
     print(f"trace=ok trace_id={trace_id}")
+    try:
+        result = run_otlp_smoke()
+        print(f"otlp_export=ok requests={len(result['requests'])}")
+    except Exception as exc:
+        print(f"otlp_export=skipped reason={exc}")
 
 
 def main() -> None:

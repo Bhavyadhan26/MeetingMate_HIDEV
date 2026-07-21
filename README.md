@@ -56,6 +56,14 @@ Run integration smoke checks:
 python scripts/smoke_integrations.py
 ```
 
+To verify the container OTLP export path against a local receiver:
+
+```bash
+docker compose exec backend python -m backend.app.observability.otlp_smoke
+```
+
+Use `LYZR_OTLP_ENDPOINT` for the collector URL. Set `LYZR_API_KEY` for bearer auth, or `LYZR_OTLP_HEADERS` for JSON or comma-separated header values when the target collector requires custom headers.
+
 To require a live Qdrant check:
 
 ```bash

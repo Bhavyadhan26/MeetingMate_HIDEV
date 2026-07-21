@@ -1,3 +1,3 @@
-from .tracing import trace_event
+from .tracing import flush_traces, trace_event
 
-__all__ = ["trace_event"]
+__all__ = ["flush_traces", "trace_event"]
