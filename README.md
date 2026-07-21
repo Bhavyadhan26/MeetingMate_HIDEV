@@ -7,7 +7,7 @@ This project addresses Decision Decay: the tendency for meeting commitments to b
 ```
 Transcript Upload
   -> PII Redaction
-  -> ADK-style Manager
+  -> Google ADK Manager
       -> Summarizer Agent
       -> Action Item Extractor
       -> Conservative Decision Extractor
@@ -22,7 +22,7 @@ Transcript Upload
 
 | Layer | Technology | Role |
 |---|---|---|
-| Agent orchestration | Google ADK | Production dependency for discrete agents and parallel/sequential workflow patterns. Local tests use the same manager contract without requiring credentials. |
+| Agent orchestration | Google ADK | Docker/runtime path uses an ADK `SequentialAgent` wrapping a `ParallelAgent` for extraction. Local tests use a deterministic fallback when ADK is absent. |
 | Vector memory | Qdrant | Persistent semantic memory target for decisions, action items, and meeting chunks. Local mode uses the same payload contract in JSON for offline verification. |
 | Observability | Lyzr / OTLP | Agent trace target. Local runs emit inspectable JSONL traces and include the configured Lyzr OTLP endpoint. |
 | Backend | FastAPI, Python | API and business services. |
@@ -48,7 +48,7 @@ Backend: `http://localhost:8000`
 Frontend: `http://localhost:5173`  
 Qdrant: `http://localhost:6333`
 
-The compose stack runs the backend with `MEMORY_BACKEND=qdrant`, so Qdrant is load-bearing in the demo path.
+The compose stack runs the backend with `MEMORY_BACKEND=qdrant` and `google-adk` installed, so Qdrant and ADK orchestration are load-bearing in the demo path.
 
 Run integration smoke checks:
 
@@ -84,7 +84,7 @@ The latest verified output is recorded in [docs/EVAL.md](docs/EVAL.md).
 
 ## Known Limitations
 
-The repository currently ships an offline-verifiable MVP plus live Qdrant and OTLP tracing adapters. Local tests run without cloud credentials by using deterministic adapters; the Docker demo uses Qdrant as the active memory backend. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
+The repository currently ships an offline-verifiable MVP plus live Qdrant, ADK, and OTLP tracing adapters. Local tests run without cloud credentials by using deterministic adapters; the Docker demo uses Qdrant as the active memory backend and ADK for extraction orchestration. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
 
 ## Project Structure
 

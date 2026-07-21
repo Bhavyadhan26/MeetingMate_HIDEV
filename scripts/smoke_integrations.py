@@ -12,6 +12,7 @@ from backend.app.agents.adk_runtime import detect_adk_runtime
 from backend.app.memory.vector_store import LocalVectorMemory, QdrantVectorMemory
 from backend.app.models.schemas import Decision
 from backend.app.observability import trace_event
+from backend.app.services.pipeline import MeetingPipeline
 
 
 def smoke_local_memory() -> None:
@@ -53,6 +54,21 @@ def smoke_qdrant() -> None:
 def smoke_adk() -> None:
     status = detect_adk_runtime()
     print(f"adk_available={status.available} detail={status.detail} version={status.version}")
+    if status.available:
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp.close()
+        path = Path(tmp.name)
+        path.unlink(missing_ok=True)
+        memory = LocalVectorMemory(str(path))
+        result = MeetingPipeline(memory).process(
+            "ADK smoke",
+            "adk-smoke",
+            "We decided use Qdrant for organizational memory.",
+            attendees=[],
+        )
+        assert result.decisions and result.decisions[0].text == "use Qdrant for organizational memory"
+        path.unlink(missing_ok=True)
+        print(f"adk_graph=ok trace_id={result.trace_id}")
 
 
 def smoke_trace() -> None:

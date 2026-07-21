@@ -33,6 +33,8 @@ Latest live stack verification:
 docker compose build -> backend image built successfully
 docker compose up -d --build backend -> backend and Qdrant running
 container ADK detection -> ADKRuntimeStatus(available=True, detail='google.adk import succeeded', version='1.0.0')
+container ADK graph smoke -> manager trace emitted adk_graph_finish for meeting_intelligence_adk_manager / parallel_extraction_swarm
+live HTTP ingest trace -> orchestration='adk parallel extraction, sequential drift write'
 POST /v1/transcripts first meeting -> active decision persisted through Qdrant
 POST /v1/transcripts reversal -> Potential Conflict with prior_decision_id
 POST /v1/decisions/{id}/resolve -> status resolved
