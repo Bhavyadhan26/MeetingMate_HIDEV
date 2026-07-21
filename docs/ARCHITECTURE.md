@@ -24,7 +24,7 @@ The local mode is intentionally deterministic so the phase gates can be tested w
 | Offline deterministic | `MEMORY_BACKEND=local` | Unit tests and `scripts/run_eval.py` run without cloud credentials. |
 | Qdrant live memory | `MEMORY_BACKEND=qdrant`, `QDRANT_URL=http://localhost:6333` | `scripts/smoke_integrations.py` with `SMOKE_QDRANT=1` and the live HTTP ingest check write/read real `decisions`, `action_items`, and `meeting_chunks` collections. |
 | ADK extraction graph | `google-adk` installed | Manager trace records ADK availability plus `adk_graph_finish` with `meeting_intelligence_adk_manager`, `parallel_extraction_swarm`, and event count. |
-| Lyzr/OTLP tracing | `LYZR_OTLP_ENDPOINT` set, optional `LYZR_API_KEY` / `LYZR_OTLP_HEADERS` | `trace_event` writes local JSONL evidence and emits OpenTelemetry spans to the configured endpoint; `python -m backend.app.observability.otlp_smoke` verifies a real protobuf POST to `/v1/traces` in the container. |
+| Lyzr/OTLP tracing | `LYZR_OTLP_ENDPOINT` set, optional `LYZR_API_KEY` / `LYZR_OTLP_HEADERS` | `trace_event` writes local JSONL evidence and emits OpenTelemetry spans to the configured endpoint; `python -m backend.app.observability.otlp_smoke` verifies a real protobuf POST to `/v1/traces`, and `python -m backend.app.observability.pipeline_otlp_smoke` verifies full pipeline agent events in the container. |
 
 ## Failure Handling
 

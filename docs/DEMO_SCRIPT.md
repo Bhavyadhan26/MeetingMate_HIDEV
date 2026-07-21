@@ -71,9 +71,10 @@ Expected result: trace records exist for manager, summarizer, action item extrac
 
 ```bash
 docker compose exec backend python -m backend.app.observability.otlp_smoke
+docker compose exec backend python -m backend.app.observability.pipeline_otlp_smoke
 ```
 
-Expected result: JSON output includes a request with `path` `/v1/traces`, `content_type` `application/x-protobuf`, and non-zero `content_length`.
+Expected result: JSON output includes a request with `path` `/v1/traces`, `content_type` `application/x-protobuf`, and non-zero `content_length`; the pipeline smoke also lists `manager`, `summarizer`, `action_item_extractor`, `decision_extractor`, and `decision_drift_agent`.
 
 11. Confirm Qdrant contains decisions:
 
