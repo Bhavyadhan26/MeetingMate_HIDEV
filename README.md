@@ -94,6 +94,12 @@ python scripts/run_eval.py
 
 The latest verified output is recorded in [docs/EVAL.md](docs/EVAL.md).
 
+Run the git-history secret guard before release commits:
+
+```bash
+python scripts/check_no_secrets_tracked.py
+```
+
 ## Known Limitations
 
 The repository currently ships an offline-verifiable MVP plus live Qdrant, ADK, and OTLP tracing adapters. Local tests run without cloud credentials by using deterministic adapters; the Docker demo uses Qdrant as the active memory backend and ADK for extraction orchestration. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
