@@ -26,6 +26,10 @@ function escapeHtml(value) {
   }[char]));
 }
 
+function parseList(value) {
+  return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
 function renderDecision(decision) {
   const drift = decision.drift ? decision.drift.label : "New";
   const prior = decision.drift && decision.drift.prior_decision_id ? `<p>Prior: ${escapeHtml(decision.drift.prior_decision_id)}</p>` : "";
@@ -91,8 +95,8 @@ document.querySelector("#upload-form").addEventListener("submit", async (event) 
       title: document.querySelector("#title").value,
       team_id: document.querySelector("#team").value,
       transcript: document.querySelector("#transcript").value,
-      attendees: ["Asha Rao", "Marco Lee"],
-      agenda: ["memory ledger"]
+      attendees: parseList(document.querySelector("#attendees").value),
+      agenda: parseList(document.querySelector("#upload-agenda").value)
     })
   });
   const job = await response.json();
@@ -165,7 +169,11 @@ decisionsEl.addEventListener("click", async (event) => {
   const response = await fetch(`${API}/v1/decisions/${id}/resolve`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ resolver: "Team Lead", resolver_role: "team_lead", note: "Acknowledged and resolved in demo." })
+    body: JSON.stringify({
+      resolver: document.querySelector("#resolver").value || "Reviewer",
+      resolver_role: document.querySelector("#resolver-role").value,
+      note: document.querySelector("#resolution-note").value || "Resolved in review."
+    })
   });
   const result = await response.json();
   if (!response.ok) {

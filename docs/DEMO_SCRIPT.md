@@ -10,6 +10,8 @@ Asha Rao: We decided use Qdrant as the persistent vector ledger. Marco will prep
 
 Expected result: the status badge moves through queued/processing, then the summary, one active decision, and one action item appear.
 
+The upload form sends the visible team id, attendee list, and meeting agenda fields with the transcript. The default demo values are `demo-team`, `Asha Rao, Marco Lee`, and `memory ledger, ingestion`.
+
 4. Process this second transcript:
 
 ```text
@@ -26,7 +28,7 @@ curl "http://localhost:8000/v1/decisions/conflicts?team_id=demo-team"
 
 Expected result: the conflict appears with escalation metadata.
 
-6. Click resolve on the conflict.
+6. Click resolve on the conflict. Use one of the allowed resolver roles shown in the form, such as `team_lead`.
 
 Expected result: the decision status changes to `resolved`.
 

@@ -21,6 +21,8 @@
           <h2>Transcript</h2>
           <input id="title" value="Platform architecture sync" aria-label="Meeting title" />
           <input id="team" value="demo-team" aria-label="Team id" />
+          <input id="attendees" value="Asha Rao, Marco Lee" aria-label="Attendees" />
+          <input id="upload-agenda" value="memory ledger, ingestion" aria-label="Meeting agenda topics" />
           <textarea id="transcript" aria-label="Transcript">Asha Rao: We decided use Qdrant as the persistent vector ledger. Marco will prepare the ingestion checklist by Friday.</textarea>
           <button type="submit">Process Meeting</button>
         </form>
@@ -56,6 +58,16 @@
 
       <section class="panel">
         <h2>Decisions</h2>
+        <div class="review-row">
+          <input id="resolver" value="Team Lead" aria-label="Resolver name" />
+          <select id="resolver-role" aria-label="Resolver role">
+            <option value="team_lead">team_lead</option>
+            <option value="decision_owner">decision_owner</option>
+            <option value="admin">admin</option>
+            <option value="observer">observer</option>
+          </select>
+          <input id="resolution-note" value="Acknowledged and resolved in review." aria-label="Resolution note" />
+        </div>
         <div id="decisions" class="decision-list empty-state">No decisions yet.</div>
       </section>
     </main>
