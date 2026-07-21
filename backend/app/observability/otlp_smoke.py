@@ -52,7 +52,7 @@ def run_otlp_smoke() -> dict[str, Any]:
     os.environ["LYZR_OTLP_ENDPOINT"] = endpoint
     os.environ["LYZR_OTLP_HEADERS"] = json.dumps({"x-lyzr-smoke": "true"})
     try:
-        from backend.app.observability.tracing import flush_traces, trace_event
+        from backend.app.observability.tracing import flush_traces, shutdown_traces, trace_event
 
         trace_id = trace_event("otlp_smoke", "export", {"component": "otlp_smoke", "smoke": True})
         flush_traces()
@@ -67,8 +67,13 @@ def run_otlp_smoke() -> dict[str, Any]:
             "requests": _OtlpCaptureHandler.requests,
         }
     finally:
+        try:
+            shutdown_traces()
+        except UnboundLocalError:
+            pass
         server.shutdown()
         thread.join(timeout=2)
+        server.server_close()
         if old_endpoint is None:
             os.environ.pop("LYZR_OTLP_ENDPOINT", None)
         else:

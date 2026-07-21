@@ -111,10 +111,26 @@ class QdrantVectorMemory:
     def _point_id(decision_id: str) -> str:
         return str(uuid5(NAMESPACE_URL, f"meetingmate:{decision_id}"))
 
+    def _with_retry(self, label: str, operation: Any) -> Any:
+        attempts = int(os.getenv("QDRANT_RETRY_ATTEMPTS", "3"))
+        delay = float(os.getenv("QDRANT_RETRY_DELAY_SECONDS", "0.2"))
+        last_error: Optional[Exception] = None
+        for attempt in range(attempts):
+            try:
+                return operation()
+            except Exception as exc:
+                last_error = exc
+                if attempt < attempts - 1:
+                    time.sleep(delay * (2 ** attempt))
+        raise RuntimeError(f"Qdrant {label} failed after {attempts} attempts: {last_error}") from last_error
+
     def reset(self) -> None:
-        for collection in (DECISIONS_COLLECTION, ACTION_ITEMS_COLLECTION, MEETING_CHUNKS_COLLECTION):
-            if self.client.collection_exists(collection):
-                self.client.delete_collection(collection)
+        def operation() -> None:
+            for collection in (DECISIONS_COLLECTION, ACTION_ITEMS_COLLECTION, MEETING_CHUNKS_COLLECTION):
+                if self.client.collection_exists(collection):
+                    self.client.delete_collection(collection)
+
+        self._with_retry("reset", operation)
         self.__init__(os.getenv("QDRANT_URL", "http://localhost:6333"), os.getenv("QDRANT_API_KEY", ""))
 
     def upsert_decision(self, decision: Any) -> None:
@@ -122,19 +138,28 @@ class QdrantVectorMemory:
         payload = decision.model_dump() if hasattr(decision, "model_dump") else dict(decision.__dict__)
         vector = embed_text(payload["text"])
         payload.pop("vector", None)
-        self.client.upsert(
-            collection_name=DECISIONS_COLLECTION,
-            points=[PointStruct(id=self._point_id(payload["id"]), vector=vector, payload=payload)],
+        self._with_retry(
+            "upsert_decision",
+            lambda: self.client.upsert(
+                collection_name=DECISIONS_COLLECTION,
+                points=[PointStruct(id=self._point_id(payload["id"]), vector=vector, payload=payload)],
+            ),
         )
 
     def update_decision(self, decision_id: str, **fields: Any) -> Optional[Dict[str, Any]]:
         point_id = self._point_id(decision_id)
-        points = self.client.retrieve(collection_name=DECISIONS_COLLECTION, ids=[point_id], with_payload=True)
+        points = self._with_retry(
+            "retrieve_decision",
+            lambda: self.client.retrieve(collection_name=DECISIONS_COLLECTION, ids=[point_id], with_payload=True),
+        )
         if not points:
             return None
         updated = dict(points[0].payload or {})
         updated.update(fields)
-        self.client.set_payload(collection_name=DECISIONS_COLLECTION, payload=fields, points=[point_id])
+        self._with_retry(
+            "update_decision",
+            lambda: self.client.set_payload(collection_name=DECISIONS_COLLECTION, payload=fields, points=[point_id]),
+        )
         return updated
 
     def search_decisions(self, query: str, team_id: str, limit: int = 5, status: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -144,12 +169,15 @@ class QdrantVectorMemory:
         conditions = [FieldCondition(key="team_id", match=MatchValue(value=team_id))]
         if status:
             conditions.append(FieldCondition(key="status", match=MatchValue(value=status)))
-        hits = self.client.search(
-            collection_name=DECISIONS_COLLECTION,
-            query_vector=embed_text(query),
-            query_filter=Filter(must=conditions),
-            limit=limit,
-            with_payload=True,
+        hits = self._with_retry(
+            "search_decisions",
+            lambda: self.client.search(
+                collection_name=DECISIONS_COLLECTION,
+                query_vector=embed_text(query),
+                query_filter=Filter(must=conditions),
+                limit=limit,
+                with_payload=True,
+            ),
         )
         results: List[Dict[str, Any]] = []
         for hit in hits:

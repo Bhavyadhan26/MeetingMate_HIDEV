@@ -43,4 +43,6 @@ GET /v1/memory/search -> cited active and resolved decisions
 POST /v1/briefs/pre-meeting -> agenda topic 'Qdrant ledger' returned 1 cited prior decision with source excerpt
 UI verification -> process, conflict display, resolve, and search all rendered correctly
 UI brief verification -> clicking Brief rendered 'Qdrant ledger' with 1 cited active decision
+hardening tests -> malformed transcript returns structured 400, dependency outage maps to structured 503, provider rate limit maps to structured 429, Qdrant retry succeeds after transient failures
+live hardening check -> stopped Qdrant, GET /v1/memory/search returned 503 dependency_unavailable; restarted Qdrant/backend and ingest plus recall returned 200 with cited source excerpt
 ```

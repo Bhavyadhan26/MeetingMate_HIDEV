@@ -8,6 +8,7 @@ The system is organized as a transcript-to-memory pipeline.
 4. `backend/app/agents/decision_drift_agent.py` searches active prior decisions and assigns `New`, `Related`, or `Potential Conflict`.
 5. `backend/app/agents/recall_agent.py` turns a natural-language query into cited decision hits and builds pre-meeting briefs from agenda topics.
 6. `backend/app/observability/tracing.py` emits an inspectable trace for each agent step and carries the Lyzr OTLP endpoint configuration.
+7. `backend/app/services/errors.py` defines stable API error payloads for malformed input, dependency outages, and provider rate limits.
 
 The external documentation used for alignment is current as of 2026-07-21: Google ADK exposes build/run guidance for Python agents and multi-agent workflows, Google Cloud's MCP overview describes MCP hosts/clients/servers and remote HTTP servers, Qdrant quickstart covers local Docker usage, and Lyzr documents enterprise agent observability/integration concepts.
 
@@ -21,3 +22,7 @@ The local mode is intentionally deterministic so the phase gates can be tested w
 | Qdrant live memory | `MEMORY_BACKEND=qdrant`, `QDRANT_URL=http://localhost:6333` | `scripts/smoke_integrations.py` with `SMOKE_QDRANT=1` upserts and searches a real Qdrant collection. |
 | ADK extraction graph | `google-adk` installed | Manager trace records ADK availability plus `adk_graph_finish` with `meeting_intelligence_adk_manager`, `parallel_extraction_swarm`, and event count. |
 | Lyzr/OTLP tracing | `LYZR_OTLP_ENDPOINT` set, optional `LYZR_API_KEY` / `LYZR_OTLP_HEADERS` | `trace_event` writes local JSONL evidence and emits OpenTelemetry spans to the configured endpoint; `python -m backend.app.observability.otlp_smoke` verifies a real protobuf POST to `/v1/traces` in the container. |
+
+## Failure Handling
+
+Malformed transcript and agenda payloads return structured `400` responses. Runtime dependency failures such as Qdrant connection loss are retried with exponential backoff in the Qdrant adapter and surfaced as structured `503` responses. Provider quota/rate-limit errors are classified as structured `429` responses so the UI can show a retryable state instead of a raw server error.

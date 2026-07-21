@@ -7,6 +7,7 @@ except Exception:  # pragma: no cover
     FastAPI = None
 
 from backend.app.api.routes import pre_meeting_brief, process_transcript, resolve_decision, search_memory
+from backend.app.services.errors import AppError
 
 
 if FastAPI:
@@ -15,26 +16,33 @@ if FastAPI:
 
     @app.post("/v1/transcripts")
     def ingest_transcript(payload: dict) -> dict:
-        if not payload.get("transcript"):
-            raise HTTPException(status_code=400, detail="transcript is required")
-        return process_transcript(payload)
+        return _handle_app_error(lambda: process_transcript(payload))
 
     @app.get("/v1/memory/search")
     def memory_search(query: str, team_id: str = "demo-team") -> dict:
-        return search_memory(query, team_id)
+        return _handle_app_error(lambda: search_memory(query, team_id))
 
     @app.post("/v1/briefs/pre-meeting")
     def brief_pre_meeting(payload: dict) -> dict:
-        agenda = payload.get("agenda", [])
-        if not agenda:
-            raise HTTPException(status_code=400, detail="agenda is required")
-        return pre_meeting_brief(payload)
+        return _handle_app_error(lambda: pre_meeting_brief(payload))
 
     @app.post("/v1/decisions/{decision_id}/resolve")
     def decision_resolve(decision_id: str, payload: dict) -> dict:
-        result = resolve_decision(decision_id, payload.get("resolver", "Team Lead"), payload.get("note", "Resolved by human review."))
-        if "error" in result:
-            raise HTTPException(status_code=404, detail=result["error"])
-        return result
+        def run() -> dict:
+            result = resolve_decision(decision_id, payload.get("resolver", "Team Lead"), payload.get("note", "Resolved by human review."))
+            if "error" in result:
+                raise HTTPException(status_code=404, detail=result["error"])
+            return result
+
+        return _handle_app_error(run)
+
+
+    def _handle_app_error(operation: object) -> dict:
+        try:
+            return operation()
+        except HTTPException:
+            raise
+        except AppError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from exc
 else:
     app = None

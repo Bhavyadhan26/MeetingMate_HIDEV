@@ -19,7 +19,6 @@ def _get_tracer() -> Any:
     if not endpoint:
         return None
     try:
-        from opentelemetry import trace
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
@@ -28,9 +27,8 @@ def _get_tracer() -> Any:
         headers = _otlp_headers()
         provider = TracerProvider(resource=Resource.create({"service.name": "meetingmate-agent-swarm"}))
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, headers=headers)))
-        trace.set_tracer_provider(provider)
         _PROVIDER = provider
-        _TRACER = trace.get_tracer("meetingmate")
+        _TRACER = provider.get_tracer("meetingmate")
         return _TRACER
     except Exception as exc:
         _write_trace_error(exc)
@@ -75,6 +73,14 @@ def flush_traces(timeout_millis: int = 5000) -> bool:
     if _PROVIDER is None:
         return False
     return bool(_PROVIDER.force_flush(timeout_millis=timeout_millis))
+
+
+def shutdown_traces() -> None:
+    global _PROVIDER, _TRACER
+    if _PROVIDER is not None:
+        _PROVIDER.shutdown()
+    _PROVIDER = None
+    _TRACER = None
 
 
 def trace_event(agent_name: str, event: str, payload: Dict[str, Any]) -> str:
