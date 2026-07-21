@@ -68,6 +68,11 @@
           </select>
           <input id="resolution-note" value="Acknowledged and resolved in review." aria-label="Resolution note" />
         </div>
+        <div class="search-row">
+          <button id="refresh-conflicts" type="button">Refresh Conflicts</button>
+          <span id="conflict-count" class="status">0 open</span>
+        </div>
+        <div id="conflicts" class="decision-list empty-state">No unresolved conflicts loaded.</div>
         <div id="decisions" class="decision-list empty-state">No decisions yet.</div>
       </section>
     </main>

@@ -1,11 +1,14 @@
 const API = "http://localhost:8000";
 const statusEl = document.querySelector("#status");
 const decisionsEl = document.querySelector("#decisions");
+const conflictsEl = document.querySelector("#conflicts");
+const conflictCountEl = document.querySelector("#conflict-count");
 const summaryEl = document.querySelector("#summary");
 const actionsEl = document.querySelector("#actions");
 const answerEl = document.querySelector("#answer");
 const briefEl = document.querySelector("#brief-output");
 let currentDecisions = [];
+let currentConflicts = [];
 
 function badge(status) {
   const value = String(status || "unknown");
@@ -33,12 +36,14 @@ function parseList(value) {
 function renderDecision(decision) {
   const drift = decision.drift ? decision.drift.label : "New";
   const prior = decision.drift && decision.drift.prior_decision_id ? `<p>Prior: ${escapeHtml(decision.drift.prior_decision_id)}</p>` : "";
-  const resolve = decision.status === "conflicted" ? `<button data-resolve="${decision.id}" type="button">Resolve</button>` : "";
+  const escalation = decision.escalation ? `<p><strong>Escalation</strong> ${decision.escalation.expired ? "expired" : "within SLA"} (${escapeHtml(decision.escalation.age_hours)}h / ${escapeHtml(decision.escalation.timeout_hours)}h)</p>` : "";
+  const resolve = decision.status === "conflicted" ? `<button data-resolve="${escapeHtml(decision.id)}" type="button">Resolve</button>` : "";
   return `<article class="decision">
     <div>${badge(decision.status)} ${badge(drift)}</div>
     <h3>${escapeHtml(decision.text)}</h3>
     <p>${escapeHtml(decision.source_excerpt)}</p>
     ${prior}
+    ${escalation}
     ${resolve}
   </article>`;
 }
@@ -77,6 +82,18 @@ function renderDecisions(decisions) {
   }
   decisionsEl.classList.remove("empty-state");
   decisionsEl.innerHTML = currentDecisions.map(renderDecision).join("");
+}
+
+function renderConflicts(conflicts) {
+  currentConflicts = conflicts || [];
+  conflictCountEl.textContent = `${currentConflicts.length} open`;
+  if (currentConflicts.length === 0) {
+    conflictsEl.classList.add("empty-state");
+    conflictsEl.textContent = "No unresolved conflicts.";
+    return;
+  }
+  conflictsEl.classList.remove("empty-state");
+  conflictsEl.innerHTML = currentConflicts.map(renderDecision).join("");
 }
 
 function renderResult(result) {
@@ -119,6 +136,7 @@ async function pollJob(jobId) {
     if (job.status === "completed") {
       const result = job.result;
       renderResult(result);
+      await refreshConflicts();
       statusEl.textContent = `Trace ${result.trace_id}`;
       return;
     }
@@ -163,9 +181,20 @@ document.querySelector("#brief").addEventListener("click", async () => {
   </article>`).join("");
 });
 
-decisionsEl.addEventListener("click", async (event) => {
-  const id = event.target.getAttribute("data-resolve");
-  if (!id) return;
+document.querySelector("#refresh-conflicts").addEventListener("click", refreshConflicts);
+
+async function refreshConflicts() {
+  const team = encodeURIComponent(document.querySelector("#team").value);
+  const response = await fetch(`${API}/v1/decisions/conflicts?team_id=${team}`);
+  const result = await response.json();
+  if (!response.ok) {
+    showError(result);
+    return;
+  }
+  renderConflicts(result.conflicts || []);
+}
+
+async function resolveDecision(id) {
   const response = await fetch(`${API}/v1/decisions/${id}/resolve`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -181,5 +210,16 @@ decisionsEl.addEventListener("click", async (event) => {
     return;
   }
   currentDecisions = currentDecisions.map((decision) => decision.id === id ? result.decision : decision);
+  currentConflicts = currentConflicts.filter((decision) => decision.id !== id);
   renderDecisions(currentDecisions);
-});
+  renderConflicts(currentConflicts);
+}
+
+function handleResolveClick(event) {
+  const id = event.target.getAttribute("data-resolve");
+  if (!id) return;
+  resolveDecision(id);
+}
+
+decisionsEl.addEventListener("click", handleResolveClick);
+conflictsEl.addEventListener("click", handleResolveClick);

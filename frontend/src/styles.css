@@ -76,6 +76,7 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
+  align-items: start;
 }
 
 .review-row {
@@ -98,6 +99,7 @@ button {
 .decision-list, .action-list {
   display: grid;
   gap: 12px;
+  margin-top: 12px;
 }
 
 .decision, .action-item {

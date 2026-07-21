@@ -28,6 +28,8 @@ curl "http://localhost:8000/v1/decisions/conflicts?team_id=demo-team"
 
 Expected result: the conflict appears with escalation metadata.
 
+You can also click `Refresh Conflicts` in the UI. Expected result: the open conflict count updates and the unresolved conflict appears in the conflict audit list.
+
 6. Click resolve on the conflict. Use one of the allowed resolver roles shown in the form, such as `team_lead`.
 
 Expected result: the decision status changes to `resolved`.
