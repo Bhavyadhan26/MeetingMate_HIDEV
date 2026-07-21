@@ -1,11 +1,15 @@
 import io
 import json
 import os
+import urllib.error
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from backend.app.observability.lyzr_live_trace_check import main as lyzr_live_trace_check_main
+from backend.app.observability.lyzr_live_trace_check import (
+    main as lyzr_live_trace_check_main,
+    verify_otlp_endpoint_accepts_traces,
+)
 from backend.app.observability.otlp_smoke import has_otlp_exporter, run_otlp_smoke
 from backend.app.observability.tracing import _otlp_headers
 
@@ -46,6 +50,21 @@ class ObservabilityTests(unittest.TestCase):
         payload = json.loads(output.getvalue())
         self.assertEqual(payload["lyzr_live_trace_check"], "not_submitted")
         self.assertIn("LYZR_OTLP_ENDPOINT", payload["error"])
+
+    def test_live_lyzr_trace_check_rejects_non_otlp_endpoint(self) -> None:
+        if not has_otlp_exporter():
+            self.skipTest("OpenTelemetry is not installed in this Python runtime.")
+        error = urllib.error.HTTPError(
+            url="https://example.test/v1/traces",
+            code=405,
+            msg="Method Not Allowed",
+            hdrs=None,
+            fp=io.BytesIO(b'{"detail":"Method Not Allowed"}'),
+        )
+        with patch.dict(os.environ, {"LYZR_OTLP_ENDPOINT": "https://example.test/v1/traces"}, clear=False):
+            with patch("urllib.request.urlopen", side_effect=error):
+                with self.assertRaisesRegex(RuntimeError, "status=405"):
+                    verify_otlp_endpoint_accepts_traces()
 
 
 if __name__ == "__main__":

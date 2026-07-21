@@ -38,6 +38,8 @@ Prerequisites:
 
 Copy `.env.example` to `.env` and fill only local or real secret values on your machine. Do not commit `.env`.
 
+For Qdrant Cloud and Lyzr Studio connector setup, see [docs/LYZR_QDRANT_SETUP.md](docs/LYZR_QDRANT_SETUP.md). `docker-compose.yml` reads `MEMORY_BACKEND`, `QDRANT_URL`, `QDRANT_API_KEY`, and optional Lyzr values from `.env`; when these are absent it falls back to the local Qdrant container.
+
 Run the stack:
 
 ```bash

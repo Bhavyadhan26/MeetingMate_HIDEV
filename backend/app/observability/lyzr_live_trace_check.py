@@ -4,10 +4,14 @@ import json
 import os
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
+from typing import Any
 
 from backend.app.memory.vector_store import LocalVectorMemory
 from backend.app.observability.otlp_smoke import has_otlp_exporter
+from backend.app.observability.tracing import _otlp_headers
 from backend.app.services.pipeline import MeetingPipeline
 
 EXPECTED_AGENTS = {
@@ -21,6 +25,7 @@ EXPECTED_AGENTS = {
 
 def run_live_lyzr_trace_check() -> dict:
     validate_configuration()
+    preflight = verify_otlp_endpoint_accepts_traces()
     trace_file = tempfile.NamedTemporaryFile(delete=False)
     trace_file.close()
     Path(trace_file.name).unlink(missing_ok=True)
@@ -55,6 +60,7 @@ def run_live_lyzr_trace_check() -> dict:
             "trace_id": result.trace_id,
             "orchestration": result.orchestration,
             "agents": sorted(agents),
+            "otlp_preflight": preflight,
             "flush_result": flushed,
             "lyzr_otlp_endpoint": os.environ["LYZR_OTLP_ENDPOINT"],
             "next_step": "Open Lyzr Studio and verify this trace id / service.name meetingmate-agent-swarm is visible.",
@@ -80,6 +86,31 @@ def validate_configuration() -> None:
         raise RuntimeError("Set LYZR_API_KEY or LYZR_OTLP_HEADERS so the Lyzr collector can authenticate the trace export.")
     if not has_otlp_exporter():
         raise RuntimeError("OpenTelemetry SDK/exporter is not installed. Run this in the backend container or install backend requirements.")
+
+
+def verify_otlp_endpoint_accepts_traces() -> dict[str, Any]:
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+
+    endpoint = os.environ["LYZR_OTLP_ENDPOINT"]
+    request = urllib.request.Request(
+        endpoint,
+        data=ExportTraceServiceRequest().SerializeToString(),
+        headers={**_otlp_headers(), "Content-Type": "application/x-protobuf"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            status_code = response.status
+            detail = response.read(300).decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        status_code = exc.code
+        detail = exc.read(300).decode("utf-8", errors="replace")
+    if status_code not in {200, 202}:
+        raise RuntimeError(
+            f"Configured Lyzr OTLP endpoint did not accept OTLP/HTTP traces: "
+            f"status={status_code} response={detail!r}"
+        )
+    return {"status_code": status_code}
 
 
 def main() -> int:

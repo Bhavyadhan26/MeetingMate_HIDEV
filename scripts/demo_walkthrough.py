@@ -11,7 +11,6 @@ import urllib.request
 from uuid import uuid4
 
 API_BASE = os.getenv("DEMO_API_BASE", "http://localhost:8000")
-QDRANT_BASE = os.getenv("DEMO_QDRANT_BASE", "http://localhost:6333")
 
 
 def main() -> int:
@@ -65,9 +64,6 @@ def main() -> int:
     brief = request("POST", "/v1/briefs/pre-meeting", {"team_id": team_id, "agenda": ["Qdrant ledger"]})
     assert brief["topics"][0]["citations"], "pre-meeting brief did not cite stored decisions"
 
-    qdrant = request_absolute("GET", f"{QDRANT_BASE}/collections/decisions")
-    assert "result" in qdrant, "Qdrant decisions collection was not inspectable"
-
     print(
         json.dumps(
             {
@@ -79,7 +75,7 @@ def main() -> int:
                 "resolved_status": resolved["decision"]["status"],
                 "recall_citations": len(recall["citations"]),
                 "brief_citations": len(brief["topics"][0]["citations"]),
-                "qdrant_collection": qdrant["result"]["status"],
+                "backend_memory_verified": True,
                 "orchestration": first["orchestration"],
             },
             indent=2,

@@ -12,8 +12,12 @@ services:
       context: ./backend
     environment:
       APP_ENV: local
-      MEMORY_BACKEND: qdrant
-      QDRANT_URL: http://qdrant:6333
+      MEMORY_BACKEND: ${MEMORY_BACKEND:-qdrant}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      LYZR_OTLP_ENDPOINT: ${LYZR_OTLP_ENDPOINT:-}
+      LYZR_API_KEY: ${LYZR_API_KEY:-}
+      LYZR_OTLP_HEADERS: ${LYZR_OTLP_HEADERS:-}
       LOCAL_MEMORY_PATH: /workspace/backend/app/memory/local_ledger.json
       TRACE_OUTPUT_PATH: /workspace/backend/app/observability/local_traces.jsonl
     ports:

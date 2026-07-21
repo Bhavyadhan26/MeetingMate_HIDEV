@@ -145,7 +145,7 @@ class QdrantVectorMemory:
     def __init__(self, url: str, api_key: str = "") -> None:
         try:
             from qdrant_client import QdrantClient
-            from qdrant_client.models import Distance, VectorParams
+            from qdrant_client.models import Distance, PayloadSchemaType, VectorParams
         except Exception as exc:  # pragma: no cover - exercised only without optional dep
             raise RuntimeError("MEMORY_BACKEND=qdrant requires qdrant-client to be installed.") from exc
 
@@ -160,6 +160,9 @@ class QdrantVectorMemory:
                             collection_name=collection,
                             vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
                         )
+                    self._ensure_payload_index(collection, "team_id", PayloadSchemaType.KEYWORD)
+                    if collection == DECISIONS_COLLECTION:
+                        self._ensure_payload_index(collection, "status", PayloadSchemaType.KEYWORD)
                     last_error = None
                     break
                 except Exception as exc:
@@ -167,6 +170,17 @@ class QdrantVectorMemory:
                     time.sleep(1)
             if last_error is not None:
                 raise RuntimeError(f"Could not initialize Qdrant collection {collection}: {last_error}") from last_error
+
+    def _ensure_payload_index(self, collection: str, field_name: str, field_schema: Any) -> None:
+        try:
+            self.client.create_payload_index(
+                collection_name=collection,
+                field_name=field_name,
+                field_schema=field_schema,
+            )
+        except Exception as exc:
+            if "already exists" not in str(exc).lower():
+                raise
 
     @staticmethod
     def _point_id(item_id: str, namespace: str = DECISIONS_COLLECTION) -> str:

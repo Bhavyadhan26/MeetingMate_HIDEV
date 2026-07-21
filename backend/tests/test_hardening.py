@@ -116,6 +116,25 @@ class HardeningTests(unittest.TestCase):
             self.assertEqual(memory._with_retry("unit_test", operation), "ok")
         self.assertEqual(calls["count"], 3)
 
+    def test_qdrant_payload_index_helper_is_idempotent(self) -> None:
+        class Client:
+            def create_payload_index(self, **_: str) -> None:
+                raise RuntimeError("payload index already exists")
+
+        memory = QdrantVectorMemory.__new__(QdrantVectorMemory)
+        memory.client = Client()
+        memory._ensure_payload_index("decisions", "team_id", "keyword")
+
+    def test_qdrant_payload_index_helper_raises_real_errors(self) -> None:
+        class Client:
+            def create_payload_index(self, **_: str) -> None:
+                raise RuntimeError("permission denied")
+
+        memory = QdrantVectorMemory.__new__(QdrantVectorMemory)
+        memory.client = Client()
+        with self.assertRaisesRegex(RuntimeError, "permission denied"):
+            memory._ensure_payload_index("decisions", "team_id", "keyword")
+
     def test_resolution_rejects_unprivileged_role(self) -> None:
         from backend.app.api.routes import resolve_decision_with_role
 
