@@ -57,4 +57,5 @@ async job retention check -> completed/failed transcript jobs include `expires_a
 secret history check -> `python scripts/check_no_secrets_tracked.py` returned `No .env or credential-like files are tracked in git history.`
 frontend API layer check -> `node --check frontend/src/main.js`, `node --check frontend/src/api/client.js`, and live nginx fetches for `/index.html` plus `/api/client.js` passed; `index.html` loads `main.js` as a module and all browser fetch calls live in `frontend/src/api/client.js`
 demo walkthrough check -> `python scripts/demo_walkthrough.py` returned `{"demo_walkthrough":"ok","team_id":"demo-46d9b297","first_decisions":1,"first_action_items":1,"conflict_id":"decision-e31de9b68c","resolved_status":"resolved","recall_citations":2,"brief_citations":2,"qdrant_collection":"green"}` against the live local stack
+browser UI smoke check -> in-app browser processed first and contradictory transcripts for team `ui-smoke-1b096c56`, rendered a Potential Conflict, resolved it to `0 open`, then rendered Qdrant recall and pre-meeting brief text through the module-based frontend
 ```
