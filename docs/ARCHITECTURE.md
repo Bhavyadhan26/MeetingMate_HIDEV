@@ -9,6 +9,7 @@ The system is organized as a transcript-to-memory pipeline.
 5. `backend/app/agents/recall_agent.py` turns a natural-language query into cited decision hits and builds pre-meeting briefs from agenda topics.
 6. `backend/app/observability/tracing.py` emits an inspectable trace for each agent step and carries the Lyzr OTLP endpoint configuration.
 7. `backend/app/services/errors.py` defines stable API error payloads for malformed input, dependency outages, and provider rate limits.
+8. `frontend/src/api/client.js` is the browser API client layer used by the static UI in `frontend/src/main.js`; `frontend/src/components/` and `frontend/src/pages/` are present for the required frontend structure as the UI grows beyond the MVP page.
 
 Transcript ingestion has two API modes. `POST /v1/transcripts` remains a synchronous compatibility path for scripts and tests. `POST /v1/transcripts/async` creates an in-process job and `GET /v1/transcripts/jobs/{job_id}` returns `queued`, `processing`, `completed`, or `failed` state for the UI polling flow. Terminal jobs include `expires_at` and are purged after `TRANSCRIPT_JOB_TTL_SECONDS` so the in-process queue does not grow without bound. This keeps the MVP dependency-light while making processing status real; production can replace the in-process executor with Celery/Redis behind the same job contract.
 

@@ -55,4 +55,5 @@ UI metadata controls check -> upload form now sends visible attendee and agenda 
 UI conflict audit check -> frontend exposes `Refresh Conflicts`, calls `/v1/decisions/conflicts`, renders unresolved conflicts with escalation metadata, and removes resolved items from the open conflict audit list after `/v1/decisions/{id}/resolve`; live conflict audit flow for team audit-9b5faa49 created conflicted decision decision-111d8e6d0b, listed it, resolved it as `resolved`, and confirmed the open conflict list became empty
 async job retention check -> completed/failed transcript jobs include `expires_at` and expired terminal jobs are purged while in-progress jobs remain pollable
 secret history check -> `python scripts/check_no_secrets_tracked.py` returned `No .env or credential-like files are tracked in git history.`
+frontend API layer check -> `node --check frontend/src/main.js`, `node --check frontend/src/api/client.js`, and live nginx fetches for `/index.html` plus `/api/client.js` passed; `index.html` loads `main.js` as a module and all browser fetch calls live in `frontend/src/api/client.js`
 ```

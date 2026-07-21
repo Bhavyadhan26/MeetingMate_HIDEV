@@ -1,4 +1,12 @@
-const API = "http://localhost:8000";
+import {
+  createPreMeetingBrief,
+  getTranscriptJob,
+  listConflicts,
+  resolveDecisionConflict,
+  searchMemory,
+  submitTranscript
+} from "./api/client.js";
+
 const statusEl = document.querySelector("#status");
 const decisionsEl = document.querySelector("#decisions");
 const conflictsEl = document.querySelector("#conflicts");
@@ -105,31 +113,27 @@ function renderResult(result) {
 document.querySelector("#upload-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   statusEl.textContent = "Queued";
-  const response = await fetch(`${API}/v1/transcripts/async`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  try {
+    const job = await submitTranscript({
       title: document.querySelector("#title").value,
       team_id: document.querySelector("#team").value,
       transcript: document.querySelector("#transcript").value,
       attendees: parseList(document.querySelector("#attendees").value),
       agenda: parseList(document.querySelector("#upload-agenda").value)
-    })
-  });
-  const job = await response.json();
-  if (!response.ok) {
-    showError(job);
-    return;
+    });
+    pollJob(job.job_id);
+  } catch (error) {
+    showError(error);
   }
-  pollJob(job.job_id);
 });
 
 async function pollJob(jobId) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const response = await fetch(`${API}/v1/transcripts/jobs/${jobId}`);
-    const job = await response.json();
-    if (!response.ok) {
-      showError(job);
+    let job;
+    try {
+      job = await getTranscriptJob(jobId);
+    } catch (error) {
+      showError(error);
       return;
     }
     statusEl.textContent = job.status === "processing" ? "Processing" : "Queued";
@@ -156,57 +160,54 @@ function showError(error) {
 }
 
 document.querySelector("#search").addEventListener("click", async () => {
-  const query = encodeURIComponent(document.querySelector("#query").value);
-  const team = encodeURIComponent(document.querySelector("#team").value);
-  const response = await fetch(`${API}/v1/memory/search?query=${query}&team_id=${team}`);
-  const result = await response.json();
-  answerEl.innerHTML = `<p>${escapeHtml(result.answer)}</p>${(result.citations || []).map((item) => `<p><strong>${escapeHtml(item.status)}</strong> ${escapeHtml(item.text)}</p>`).join("")}`;
+  try {
+    const result = await searchMemory(document.querySelector("#query").value, document.querySelector("#team").value);
+    answerEl.innerHTML = `<p>${escapeHtml(result.answer)}</p>${(result.citations || []).map((item) => `<p><strong>${escapeHtml(item.status)}</strong> ${escapeHtml(item.text)}</p>`).join("")}`;
+  } catch (error) {
+    showError(error);
+  }
 });
 
 document.querySelector("#brief").addEventListener("click", async () => {
   const agenda = document.querySelector("#agenda").value.split(",").map((item) => item.trim()).filter(Boolean);
-  const response = await fetch(`${API}/v1/briefs/pre-meeting`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  try {
+    const result = await createPreMeetingBrief({
       team_id: document.querySelector("#team").value,
       agenda
-    })
-  });
-  const result = await response.json();
-  briefEl.innerHTML = (result.topics || []).map((topic) => `<article class="brief-topic">
-    <h3>${escapeHtml(topic.topic)}</h3>
-    <p>${escapeHtml(topic.summary)}</p>
-    ${(topic.citations || []).map((item) => `<p><strong>${escapeHtml(item.status)}</strong> ${escapeHtml(item.text)}</p>`).join("")}
-  </article>`).join("");
+    });
+    briefEl.innerHTML = (result.topics || []).map((topic) => `<article class="brief-topic">
+      <h3>${escapeHtml(topic.topic)}</h3>
+      <p>${escapeHtml(topic.summary)}</p>
+      ${(topic.citations || []).map((item) => `<p><strong>${escapeHtml(item.status)}</strong> ${escapeHtml(item.text)}</p>`).join("")}
+    </article>`).join("");
+  } catch (error) {
+    showError(error);
+  }
 });
 
 document.querySelector("#refresh-conflicts").addEventListener("click", refreshConflicts);
 
 async function refreshConflicts() {
-  const team = encodeURIComponent(document.querySelector("#team").value);
-  const response = await fetch(`${API}/v1/decisions/conflicts?team_id=${team}`);
-  const result = await response.json();
-  if (!response.ok) {
-    showError(result);
+  let result;
+  try {
+    result = await listConflicts(document.querySelector("#team").value);
+  } catch (error) {
+    showError(error);
     return;
   }
   renderConflicts(result.conflicts || []);
 }
 
 async function resolveDecision(id) {
-  const response = await fetch(`${API}/v1/decisions/${id}/resolve`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  let result;
+  try {
+    result = await resolveDecisionConflict(id, {
       resolver: document.querySelector("#resolver").value || "Reviewer",
       resolver_role: document.querySelector("#resolver-role").value,
       note: document.querySelector("#resolution-note").value || "Resolved in review."
-    })
-  });
-  const result = await response.json();
-  if (!response.ok) {
-    showError(result);
+    });
+  } catch (error) {
+    showError(error);
     return;
   }
   currentDecisions = currentDecisions.map((decision) => decision.id === id ? result.decision : decision);
