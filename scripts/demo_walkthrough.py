@@ -27,6 +27,7 @@ def main() -> int:
     )
     assert first["decisions"], "first meeting did not produce a decision"
     assert first["action_items"], "first meeting did not produce an action item"
+    assert "adk parallel extraction" in first["orchestration"], first["orchestration"]
 
     second = process_meeting(
         {
@@ -79,6 +80,7 @@ def main() -> int:
                 "recall_citations": len(recall["citations"]),
                 "brief_citations": len(brief["topics"][0]["citations"]),
                 "qdrant_collection": qdrant["result"]["status"],
+                "orchestration": first["orchestration"],
             },
             indent=2,
         )

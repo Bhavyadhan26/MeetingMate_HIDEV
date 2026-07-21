@@ -152,6 +152,7 @@ class ProcessingResult(BaseModel):
     decisions: List[Decision]
     possible_decisions: List[PossibleDecision] = Field(default_factory=list)
     trace_id: str
+    orchestration: str
 
 
 class DecisionCitation(BaseModel):

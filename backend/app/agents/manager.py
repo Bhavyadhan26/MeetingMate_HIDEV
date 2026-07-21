@@ -90,6 +90,7 @@ class MeetingAgentManager:
             decisions=persisted,
             possible_decisions=possible,
             trace_id=trace_id,
+            orchestration=orchestration,
         )
 
     def _run_threaded_extraction(self, meeting: Meeting, transcript: Transcript, trace_id: str):

@@ -11,6 +11,8 @@ python scripts/demo_walkthrough.py
 
 Expected result: JSON output includes `demo_walkthrough: ok`, one conflicted decision that resolves to `resolved`, recall citations, brief citations, and an inspectable Qdrant `decisions` collection.
 
+For offline local-ledger seeding without the compose stack, use `python scripts/seed_demo_data.py`; that helper writes `backend/app/memory/local_ledger.json` and is separate from the Qdrant-backed Docker demo.
+
 Manual UI walkthrough:
 
 3. Process this first transcript:

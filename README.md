@@ -79,10 +79,10 @@ python scripts/smoke_integrations.py
 See [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md). The shortest path is:
 
 ```bash
-python scripts/seed_demo_data.py
+python scripts/demo_walkthrough.py
 ```
 
-Then open the UI, process a transcript that reverses the Qdrant decision, and search for Qdrant in recall.
+This exercises the running Docker stack through the API: process the baseline meeting, process a contradictory meeting, list and resolve the conflict, search recall, generate a pre-meeting brief, and inspect the Qdrant decisions collection. `scripts/seed_demo_data.py` remains available for offline local-ledger seeding when you are not running the compose stack.
 
 The UI also includes a pre-meeting brief panel. Enter agenda topics such as `Qdrant ledger` after seeding or processing meetings; the backend calls `/v1/briefs/pre-meeting` and returns cited prior decisions for each topic.
 
@@ -98,6 +98,19 @@ Run the git-history secret guard before release commits:
 
 ```bash
 python scripts/check_no_secrets_tracked.py
+```
+
+Run the full local release audit:
+
+```bash
+python scripts/final_audit.py
+```
+
+With the Docker stack running, include live Qdrant and demo walkthrough checks:
+
+```bash
+set FINAL_AUDIT_LIVE=1
+python scripts/final_audit.py
 ```
 
 ## Known Limitations
