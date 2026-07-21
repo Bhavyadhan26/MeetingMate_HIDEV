@@ -50,4 +50,5 @@ live Phase 5 check -> conflict listed via GET /v1/decisions/conflicts, observer 
 live Qdrant collection check -> direct Qdrant adapter wrote/read decisions, action_items, and meeting_chunks for team live-88be84c8
 live HTTP ingest collection check -> POST /v1/transcripts wrote 1 decision, 1 action item, and 1 meeting chunk to Qdrant for team http-1228ef65
 live async ingest check -> POST /v1/transcripts/async returned job-1c45db79a43c, polling showed processing -> completed, and the result included decisions, action_items, meeting_chunks, and trace trace-bdfa48d452a6 for team async-45269136
+UI result rendering check -> served frontend includes Summary, Action Items, and Decisions sections; live async job job-eec1c53a8f8e for team ui-00c450c3 returned summary text, action item `document the UI action item`, and decision `use Qdrant for result rendering memory`; frontend sanitizes transcript-derived text before inserting HTML
 ```

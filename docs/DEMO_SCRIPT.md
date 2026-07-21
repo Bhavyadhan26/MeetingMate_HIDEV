@@ -8,7 +8,7 @@
 Asha Rao: We decided use Qdrant as the persistent vector ledger. Marco will prepare the ingestion checklist by Friday.
 ```
 
-Expected result: the status badge moves through queued/processing, then one active decision and one action item appear.
+Expected result: the status badge moves through queued/processing, then the summary, one active decision, and one action item appear.
 
 4. Process this second transcript:
 
