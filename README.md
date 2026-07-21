@@ -48,6 +48,20 @@ Backend: `http://localhost:8000`
 Frontend: `http://localhost:5173`  
 Qdrant: `http://localhost:6333`
 
+Run integration smoke checks:
+
+```bash
+python scripts/smoke_integrations.py
+```
+
+To require a live Qdrant check:
+
+```bash
+set MEMORY_BACKEND=qdrant
+set SMOKE_QDRANT=1
+python scripts/smoke_integrations.py
+```
+
 ## Demo
 
 See [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md). The shortest path is:
@@ -68,7 +82,7 @@ The latest verified output is recorded in [docs/EVAL.md](docs/EVAL.md).
 
 ## Known Limitations
 
-The repository currently ships an offline-verifiable MVP. The code declares and isolates the real ADK, Qdrant, and Lyzr dependencies, but local tests run without those packages or cloud credentials by using deterministic adapters. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
+The repository currently ships an offline-verifiable MVP plus optional live adapters for Qdrant and OTLP tracing. Local tests run without cloud credentials by using deterministic adapters. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
 
 ## Project Structure
 

@@ -22,3 +22,7 @@ cases=10 correct=10 accuracy=100.00%
 Decision grounding is checked in `backend/tests/test_pipeline.py`: every extracted decision used in the test includes a verbatim `source_excerpt`.
 
 Known evaluation limitation: the current extractor is deterministic and conservative. It is suitable for offline proof of workflow semantics, but production LLM extraction should be evaluated on a larger human-labeled transcript set.
+
+## Integration Smoke
+
+`scripts/smoke_integrations.py` verifies local memory, ADK runtime detection, local trace emission, and optionally live Qdrant. Live Qdrant is opt-in with `SMOKE_QDRANT=1` so CI can still run without Docker.

@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
+from backend.app.agents.adk_runtime import detect_adk_runtime
 from backend.app.agents.action_item_extractor import ActionItemExtractorAgent
 from backend.app.agents.decision_drift_agent import DecisionDriftAgent
 from backend.app.agents.decision_extractor import DecisionExtractorAgent
@@ -26,7 +27,15 @@ class MeetingAgentManager:
 
     def run(self, meeting: Meeting, transcript: Transcript) -> ProcessingResult:
         trace_id = f"trace-{uuid4().hex[:12]}"
-        trace_event(self.name, "start", {"trace_id": trace_id, "meeting_id": meeting.id, "orchestration": "parallel extraction, sequential drift write"})
+        adk_status = detect_adk_runtime()
+        trace_event(self.name, "start", {
+            "trace_id": trace_id,
+            "meeting_id": meeting.id,
+            "orchestration": "parallel extraction, sequential drift write",
+            "adk_available": adk_status.available,
+            "adk_detail": adk_status.detail,
+            "adk_version": adk_status.version,
+        })
         with ThreadPoolExecutor(max_workers=3) as pool:
             summary_future = pool.submit(self.summarizer.run, transcript, trace_id)
             actions_future = pool.submit(self.actions.run, meeting, transcript, trace_id)

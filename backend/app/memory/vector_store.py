@@ -3,9 +3,29 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol
+from uuid import NAMESPACE_URL, uuid5
 
 from .embeddings import cosine, embed_text
+
+VECTOR_SIZE = 64
+DECISIONS_COLLECTION = "decisions"
+ACTION_ITEMS_COLLECTION = "action_items"
+MEETING_CHUNKS_COLLECTION = "meeting_chunks"
+
+
+class VectorMemory(Protocol):
+    def reset(self) -> None:
+        ...
+
+    def upsert_decision(self, decision: Any) -> None:
+        ...
+
+    def update_decision(self, decision_id: str, **fields: Any) -> Optional[Dict[str, Any]]:
+        ...
+
+    def search_decisions(self, query: str, team_id: str, limit: int = 5, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        ...
 
 
 class LocalVectorMemory:
@@ -57,5 +77,79 @@ class LocalVectorMemory:
         return sorted(results, key=lambda item: item["score"], reverse=True)[:limit]
 
 
-def get_memory() -> LocalVectorMemory:
+class QdrantVectorMemory:
+    """Qdrant-backed implementation of the same memory contract used locally."""
+
+    def __init__(self, url: str, api_key: str = "") -> None:
+        try:
+            from qdrant_client import QdrantClient
+            from qdrant_client.models import Distance, VectorParams
+        except Exception as exc:  # pragma: no cover - exercised only without optional dep
+            raise RuntimeError("MEMORY_BACKEND=qdrant requires qdrant-client to be installed.") from exc
+
+        self._models = __import__("qdrant_client.models", fromlist=["models"])
+        self.client = QdrantClient(url=url, api_key=api_key or None)
+        for collection in (DECISIONS_COLLECTION, ACTION_ITEMS_COLLECTION, MEETING_CHUNKS_COLLECTION):
+            if not self.client.collection_exists(collection):
+                self.client.create_collection(
+                    collection_name=collection,
+                    vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+                )
+
+    @staticmethod
+    def _point_id(decision_id: str) -> str:
+        return str(uuid5(NAMESPACE_URL, f"meetingmate:{decision_id}"))
+
+    def reset(self) -> None:
+        for collection in (DECISIONS_COLLECTION, ACTION_ITEMS_COLLECTION, MEETING_CHUNKS_COLLECTION):
+            if self.client.collection_exists(collection):
+                self.client.delete_collection(collection)
+        self.__init__(os.getenv("QDRANT_URL", "http://localhost:6333"), os.getenv("QDRANT_API_KEY", ""))
+
+    def upsert_decision(self, decision: Any) -> None:
+        PointStruct = self._models.PointStruct
+        payload = decision.model_dump() if hasattr(decision, "model_dump") else dict(decision.__dict__)
+        vector = embed_text(payload["text"])
+        payload.pop("vector", None)
+        self.client.upsert(
+            collection_name=DECISIONS_COLLECTION,
+            points=[PointStruct(id=self._point_id(payload["id"]), vector=vector, payload=payload)],
+        )
+
+    def update_decision(self, decision_id: str, **fields: Any) -> Optional[Dict[str, Any]]:
+        point_id = self._point_id(decision_id)
+        points = self.client.retrieve(collection_name=DECISIONS_COLLECTION, ids=[point_id], with_payload=True)
+        if not points:
+            return None
+        updated = dict(points[0].payload or {})
+        updated.update(fields)
+        self.client.set_payload(collection_name=DECISIONS_COLLECTION, payload=fields, points=[point_id])
+        return updated
+
+    def search_decisions(self, query: str, team_id: str, limit: int = 5, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        FieldCondition = self._models.FieldCondition
+        Filter = self._models.Filter
+        MatchValue = self._models.MatchValue
+        conditions = [FieldCondition(key="team_id", match=MatchValue(value=team_id))]
+        if status:
+            conditions.append(FieldCondition(key="status", match=MatchValue(value=status)))
+        hits = self.client.search(
+            collection_name=DECISIONS_COLLECTION,
+            query_vector=embed_text(query),
+            query_filter=Filter(must=conditions),
+            limit=limit,
+            with_payload=True,
+        )
+        results: List[Dict[str, Any]] = []
+        for hit in hits:
+            payload = dict(hit.payload or {})
+            payload["score"] = float(hit.score)
+            results.append(payload)
+        return results
+
+
+def get_memory() -> VectorMemory:
+    backend = os.getenv("MEMORY_BACKEND", "local").lower()
+    if backend == "qdrant":
+        return QdrantVectorMemory(os.getenv("QDRANT_URL", "http://localhost:6333"), os.getenv("QDRANT_API_KEY", ""))
     return LocalVectorMemory(os.getenv("LOCAL_MEMORY_PATH", "backend/app/memory/local_ledger.json"))
