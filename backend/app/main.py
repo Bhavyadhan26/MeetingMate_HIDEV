@@ -6,6 +6,7 @@ try:
 except Exception:  # pragma: no cover
     FastAPI = None
 
+from backend.app.api.protocols import a2a_agent_card, handle_a2a_jsonrpc, handle_mcp_jsonrpc
 from backend.app.api.routes import enqueue_transcript, get_transcript_job, list_unresolved_conflicts, pre_meeting_brief, process_transcript, resolve_decision_with_role, search_memory
 from backend.app.services.errors import AppError
 
@@ -55,6 +56,22 @@ if FastAPI:
     @app.get("/v1/decisions/conflicts")
     def decision_conflicts(team_id: str = "demo-team") -> dict:
         return _handle_app_error(lambda: list_unresolved_conflicts(team_id))
+
+    @app.get("/.well-known/agent-card.json")
+    def agent_card() -> dict:
+        return a2a_agent_card()
+
+    @app.post("/v1/a2a")
+    def a2a_jsonrpc(payload: dict) -> dict:
+        return _handle_app_error(lambda: handle_a2a_jsonrpc(payload))
+
+    @app.post("/mcp")
+    def mcp_jsonrpc(payload: dict) -> dict:
+        return _handle_app_error(lambda: handle_mcp_jsonrpc(payload))
+
+    @app.post("/v1/mcp")
+    def mcp_jsonrpc_v1(payload: dict) -> dict:
+        return _handle_app_error(lambda: handle_mcp_jsonrpc(payload))
 
 
     def _handle_app_error(operation: object) -> dict:

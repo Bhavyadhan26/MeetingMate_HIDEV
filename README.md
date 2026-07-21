@@ -54,6 +54,8 @@ The compose stack runs the backend with `MEMORY_BACKEND=qdrant` and `google-adk`
 
 API failures use stable JSON error details: malformed payloads return `malformed_transcript`, dependency outages return `dependency_unavailable`, and provider rate limits return `provider_rate_limited`. Qdrant read/write operations retry briefly before surfacing a dependency failure. The UI uses `POST /v1/transcripts/async` plus `GET /v1/transcripts/jobs/{job_id}` polling so users see queued/processing/completed state instead of waiting on a blank request. Completed and failed transcript jobs expire after `TRANSCRIPT_JOB_TTL_SECONDS`.
 
+Agent clients can use the same backend through protocol adapters. MCP clients can call `POST /mcp` or `POST /v1/mcp` with `tools/list` and `tools/call`. A2A clients can discover the agent at `GET /.well-known/agent-card.json` and send JSON-RPC messages to `POST /v1/a2a`.
+
 Run integration smoke checks:
 
 ```bash

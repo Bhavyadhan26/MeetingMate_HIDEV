@@ -49,6 +49,7 @@ POST /v1/briefs/pre-meeting -> agenda topic 'Qdrant ledger' returned 1 cited pri
 UI verification -> process, conflict display, resolve, and search all rendered correctly
 UI brief verification -> clicking Brief rendered 'Qdrant ledger' with 1 cited active decision
 hardening tests -> malformed transcript returns structured 400, dependency outage maps to structured 503, provider rate limit maps to structured 429, Qdrant retry succeeds after transient failures
+MCP/A2A protocol tests -> `backend/tests/test_protocols.py` verifies the A2A Agent Card, MCP tool listing, MCP recall tool routing, A2A `message/send` completed task output, `tasks/get`, and JSON-RPC method errors
 live hardening check -> stopped Qdrant, GET /v1/memory/search returned 503 dependency_unavailable; restarted Qdrant/backend and ingest plus recall returned 200 with cited source excerpt
 conflict resolution guard -> unauthorized resolver role returns authorization_failed; GET /v1/decisions/conflicts marks conflicts older than CONFLICT_ESCALATION_HOURS and emits escalation traces
 live Phase 5 check -> conflict listed via GET /v1/decisions/conflicts, observer resolve returned 403 authorization_failed, team_lead resolve returned 200 resolved, unresolved conflict list returned 0
