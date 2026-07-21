@@ -16,6 +16,8 @@ LYZR_RAG_COLLECTION=decisions
 LYZR_RAG_QUERY=What did we decide about Qdrant?
 LYZR_SYNC_QDRANT_COLLECTION=decisions
 LYZR_AGENT_ID=your-lyzr-agent-id-after-attaching-the-knowledge-base
+LYZR_CREATE_AGENT_DRY_RUN=1
+LYZR_LLM_CREDENTIAL_ID=lyzr_openai
 ```
 
 `docker-compose.yml` reads those values automatically. If they are absent, the backend uses the local Qdrant service at `http://qdrant:6333`.
@@ -84,10 +86,13 @@ Use `LYZR_SYNC_DRY_RUN=1` to preview the number of Qdrant decisions that would b
 Verify a real Lyzr Studio agent invocation against that Knowledge Base:
 
 ```bash
+python scripts/lyzr_create_agent.py
 python scripts/lyzr_agent_check.py
 ```
 
-Expected result: `lyzr_agent_check` is `ok`, the output includes a generated `session_id`, and the same session can be inspected in Lyzr Studio monitoring or agent chat history. This command requires `LYZR_AGENT_ID`; it intentionally fails if no Studio agent is attached yet.
+Expected result: `lyzr_create_agent` returns a created `agent_id` when `LYZR_CREATE_AGENT_DRY_RUN` is unset and the workspace accepts the configured payload. Copy that id to `LYZR_AGENT_ID`, then `lyzr_agent_check` should return `ok`, include a generated `session_id`, and the same session can be inspected in Lyzr Studio monitoring or agent chat history.
+
+The create helper uses Lyzr's documented `/v3/agents/` fields. If your workspace requires a specific Knowledge Base feature payload, set `LYZR_AGENT_FEATURES_JSON` to the JSON required by that workspace. `LYZR_AGENT_INCLUDE_KB_FEATURE=1` uses Lyzr's documented cookbook shape: `{"type":"KNOWLEDGE_BASE","config":{"lyzr_rag":{},"agentic_rag":[{"rag_id":"...","top_k":5,"retrieval_type":"basic","score_threshold":0}]},"priority":0}`.
 
 ## OTLP Endpoint
 
