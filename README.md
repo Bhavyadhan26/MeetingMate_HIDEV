@@ -15,7 +15,7 @@ Transcript Upload
       -> Qdrant-compatible vector memory
       -> status: active / conflicted / resolved
   -> Recall Agent + UI
-  -> Lyzr/OTLP trace output
+  -> Lyzr Studio Qdrant Knowledge Base + optional OTLP trace output
 ```
 
 ## Tech Stack
@@ -24,7 +24,7 @@ Transcript Upload
 |---|---|---|
 | Agent orchestration | Google ADK | Docker/runtime path uses an ADK `SequentialAgent` wrapping a `ParallelAgent` for extraction. Local tests use a deterministic fallback when ADK is absent. |
 | Vector memory | Qdrant | Persistent semantic memory target for decisions, action items, and meeting chunks. Local mode uses the same payload contract in JSON for offline verification. |
-| Observability | Lyzr / OTLP | Agent trace target. Local runs emit inspectable JSONL traces and include the configured Lyzr OTLP endpoint. |
+| Observability | Lyzr Studio / OTLP | Lyzr Studio reads the Qdrant-backed decision memory through a Knowledge Base/Data Connector; local runs emit inspectable JSONL traces, and OTLP export is available when Lyzr provides a collector endpoint. |
 | Backend | FastAPI, Python | API and business services. |
 | Frontend | Static HTML/CSS/JS or Vite | Demo command center UI. |
 | Eval | Python unittest and scripts | Golden drift scenarios and pipeline checks. |
@@ -69,13 +69,19 @@ docker compose exec backend python -m backend.app.observability.pipeline_otlp_sm
 
 Use `LYZR_OTLP_ENDPOINT` for the collector URL. Set `LYZR_API_KEY` for bearer auth, or `LYZR_OTLP_HEADERS` for JSON or comma-separated header values when the target collector requires custom headers.
 
-To submit a full pipeline trace to a real Lyzr tenant, set the Lyzr endpoint and auth values in the backend container environment, then run:
+To verify a Lyzr Studio Knowledge Base/RAG config that points at Qdrant, set `LYZR_API_KEY`, `LYZR_RAG_ID`, and optionally `LYZR_RAG_COLLECTION`, then run:
+
+```bash
+python scripts/lyzr_rag_check.py
+```
+
+To submit a full pipeline trace to a real Lyzr OTLP collector, set the Lyzr endpoint and auth values in the backend container environment, then run:
 
 ```bash
 docker compose exec backend python -m backend.app.observability.lyzr_live_trace_check
 ```
 
-The command prints the trace id and expected service name (`meetingmate-agent-swarm`) to inspect in Lyzr Studio.
+The OTLP command prints the trace id and expected service name (`meetingmate-agent-swarm`) to inspect in Lyzr Studio. Skip it when the workspace does not expose an external OTLP endpoint; Lyzr Studio agent runs against the Qdrant Knowledge Base are the inspectable Studio path.
 
 To require a live Qdrant check:
 
@@ -132,7 +138,7 @@ python scripts/fresh_clone_audit.py
 
 ## Known Limitations
 
-The repository currently ships an offline-verifiable MVP plus live Qdrant, ADK, and OTLP tracing adapters. Local tests run without cloud credentials by using deterministic adapters; the Docker demo uses Qdrant as the active memory backend and ADK for extraction orchestration. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
+The repository currently ships an offline-verifiable MVP plus live Qdrant, ADK, Lyzr Studio Knowledge Base verification, and optional OTLP tracing adapters. Local tests run without cloud credentials by using deterministic adapters; the Docker demo uses Qdrant as the active memory backend and ADK for extraction orchestration. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
 
 ## Project Structure
 

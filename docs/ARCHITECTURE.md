@@ -7,7 +7,7 @@ The system is organized as a transcript-to-memory pipeline.
 3. `backend/app/memory/vector_store.py` implements both the local JSON memory contract and `QdrantVectorMemory`, selected by `MEMORY_BACKEND`, for the `decisions`, `action_items`, and `meeting_chunks` collections.
 4. `backend/app/agents/decision_drift_agent.py` searches active prior decisions and assigns `New`, `Related`, or `Potential Conflict`.
 5. `backend/app/agents/recall_agent.py` turns a natural-language query into cited decision hits and builds pre-meeting briefs from agenda topics.
-6. `backend/app/observability/tracing.py` emits an inspectable trace for each agent step and carries the Lyzr OTLP endpoint configuration.
+6. `backend/app/observability/tracing.py` emits an inspectable trace for each agent step; Lyzr Studio inspection can use the Qdrant-backed Knowledge Base/Data Connector path, with optional OTLP export when a collector endpoint is available.
 7. `backend/app/services/errors.py` defines stable API error payloads for malformed input, dependency outages, and provider rate limits.
 8. `frontend/src/api/client.js` is the browser API client layer used by the static UI in `frontend/src/main.js`; `frontend/src/components/` and `frontend/src/pages/` are present for the required frontend structure as the UI grows beyond the MVP page.
 
@@ -15,9 +15,9 @@ Transcript ingestion has two API modes. `POST /v1/transcripts` remains a synchro
 
 The external documentation used for alignment is current as of 2026-07-21: Google ADK exposes build/run guidance for Python agents and multi-agent workflows, Google Cloud's MCP overview describes MCP hosts/clients/servers and remote HTTP servers, Qdrant quickstart covers local Docker usage, and Lyzr documents enterprise agent observability/integration concepts.
 
-The local mode is intentionally deterministic so the phase gates can be tested without API keys. Production deployment should set `MEMORY_BACKEND=qdrant` and export traces to Lyzr via `LYZR_OTLP_ENDPOINT`. OTLP authentication can be supplied with either `LYZR_API_KEY` for a bearer token or `LYZR_OTLP_HEADERS` for JSON/key-value headers required by the target collector.
+The local mode is intentionally deterministic so the phase gates can be tested without API keys. Production deployment should set `MEMORY_BACKEND=qdrant` and connect Lyzr Studio to the same Qdrant cluster with a Knowledge Base/Data Connector. If Lyzr provides an external OTLP collector URL, traces can also be exported via `LYZR_OTLP_ENDPOINT`; OTLP authentication can be supplied with either `LYZR_API_KEY` for a bearer token or `LYZR_OTLP_HEADERS` for JSON/key-value headers required by the target collector.
 
-`scripts/lyzr_live_trace_check.py` is the real-tenant verification hook: it refuses to run without `LYZR_OTLP_ENDPOINT` and either `LYZR_API_KEY` or `LYZR_OTLP_HEADERS`, submits a full meeting pipeline trace, then prints the trace id and `meetingmate-agent-swarm` service name for Lyzr Studio inspection.
+`scripts/lyzr_rag_check.py` verifies the Lyzr Studio Knowledge Base/RAG config that points at Qdrant. `scripts/lyzr_live_trace_check.py` is the optional OTLP verification hook: it refuses to run without a real OTLP endpoint and auth, submits a full meeting pipeline trace, then prints the trace id and `meetingmate-agent-swarm` service name for Lyzr Studio inspection.
 
 ## Integration Modes
 
@@ -26,7 +26,8 @@ The local mode is intentionally deterministic so the phase gates can be tested w
 | Offline deterministic | `MEMORY_BACKEND=local` | Unit tests and `scripts/run_eval.py` run without cloud credentials. |
 | Qdrant live memory | `MEMORY_BACKEND=qdrant`, `QDRANT_URL=http://localhost:6333` | `scripts/smoke_integrations.py` with `SMOKE_QDRANT=1` and the live HTTP ingest check write/read real `decisions`, `action_items`, and `meeting_chunks` collections. |
 | ADK extraction graph | `google-adk` installed | Manager trace records ADK availability plus `adk_graph_finish` with `meeting_intelligence_adk_manager`, `parallel_extraction_swarm`, and event count. |
-| Lyzr/OTLP tracing | `LYZR_OTLP_ENDPOINT` set, optional `LYZR_API_KEY` / `LYZR_OTLP_HEADERS` | `trace_event` writes local JSONL evidence and emits OpenTelemetry spans to the configured endpoint; `python -m backend.app.observability.otlp_smoke` verifies a real protobuf POST to `/v1/traces`, and `python -m backend.app.observability.pipeline_otlp_smoke` verifies full pipeline agent events in the container. |
+| Lyzr Studio RAG | `LYZR_API_KEY`, `LYZR_RAG_ID`, optional `LYZR_RAG_COLLECTION` | `scripts/lyzr_rag_check.py` verifies that the Lyzr Knowledge Base uses Qdrant and the expected decisions collection. |
+| Optional Lyzr/OTLP tracing | `LYZR_OTLP_ENDPOINT` set, optional `LYZR_API_KEY` / `LYZR_OTLP_HEADERS` | `trace_event` writes local JSONL evidence and emits OpenTelemetry spans to the configured endpoint; `python -m backend.app.observability.otlp_smoke` verifies a real protobuf POST to `/v1/traces`, and `python -m backend.app.observability.pipeline_otlp_smoke` verifies full pipeline agent events in the container. |
 
 ## Failure Handling
 

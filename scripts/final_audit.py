@@ -53,6 +53,7 @@ REQUIRED_PATHS = (
     "scripts/fresh_clone_audit.py",
     "scripts/check_no_secrets_tracked.py",
     "scripts/lyzr_live_trace_check.py",
+    "scripts/lyzr_rag_check.py",
 )
 README_TERMS = (
     "Decision Decay",

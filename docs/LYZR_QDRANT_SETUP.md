@@ -10,6 +10,9 @@ Create `D:\MeetingMate\.env` from `.env.example` and keep real values local:
 MEMORY_BACKEND=qdrant
 QDRANT_URL=https://your-cluster.cloud.qdrant.io
 QDRANT_API_KEY=your-qdrant-cluster-api-key
+LYZR_API_KEY=your-lyzr-api-key
+LYZR_RAG_ID=your-lyzr-knowledge-base-id
+LYZR_RAG_COLLECTION=decisions
 ```
 
 `docker-compose.yml` reads those values automatically. If they are absent, the backend uses the local Qdrant service at `http://qdrant:6333`.
@@ -55,6 +58,20 @@ In Lyzr Studio:
    - `What active decisions exist for the platform team?`
 
 Runs made through that Lyzr agent should appear in Lyzr Studio monitoring/traces.
+
+The current validated Lyzr configuration should look like this:
+
+- vector store provider: `Qdrant [MeetingMate_Qdrant]`
+- source collection intent: `decisions`
+- semantic data model: `false`
+
+Verify the saved Lyzr Knowledge Base/RAG config from the repo:
+
+```bash
+python scripts/lyzr_rag_check.py
+```
+
+Expected result: `lyzr_rag_check` is `ok`, `vector_store_provider` contains `Qdrant`, and `collection_name` contains the configured `LYZR_RAG_COLLECTION` value. This confirms the Lyzr Studio side is connected to the Qdrant-backed MeetingMate memory. To produce inspectable Lyzr Studio traces, attach that Knowledge Base to a Lyzr agent and invoke the agent in Studio.
 
 ## OTLP Endpoint
 
