@@ -80,10 +80,11 @@ Expected result: JSON output includes a request with `path` `/v1/traces`, `conte
 
 ```bash
 python scripts/lyzr_rag_check.py
+python scripts/lyzr_sync_qdrant_decisions.py
 python scripts/lyzr_rag_retrieve_check.py
 ```
 
-Expected result: JSON output includes `lyzr_rag_check: ok`, the Qdrant vector store provider, the configured decisions collection, and `lyzr_rag_retrieve_check: ok` with at least one result.
+Expected result: JSON output includes `lyzr_rag_check: ok`, the Qdrant vector store provider, the configured decisions collection, `lyzr_sync_qdrant_decisions: submitted`, and `lyzr_rag_retrieve_check: ok` with at least one result after training completes.
 
 12. If a Lyzr Studio agent has the Knowledge Base attached, verify an actual Studio-side run:
 

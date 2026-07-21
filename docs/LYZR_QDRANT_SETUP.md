@@ -14,6 +14,7 @@ LYZR_API_KEY=your-lyzr-api-key
 LYZR_RAG_ID=your-lyzr-knowledge-base-id
 LYZR_RAG_COLLECTION=decisions
 LYZR_RAG_QUERY=What did we decide about Qdrant?
+LYZR_SYNC_QDRANT_COLLECTION=decisions
 LYZR_AGENT_ID=your-lyzr-agent-id-after-attaching-the-knowledge-base
 ```
 
@@ -72,10 +73,13 @@ Verify the saved Lyzr Knowledge Base/RAG config from the repo:
 
 ```bash
 python scripts/lyzr_rag_check.py
+python scripts/lyzr_sync_qdrant_decisions.py
 python scripts/lyzr_rag_retrieve_check.py
 ```
 
-Expected result: `lyzr_rag_check` is `ok`, `vector_store_provider` contains `Qdrant`, and `collection_name` contains the configured `LYZR_RAG_COLLECTION` value. `lyzr_rag_retrieve_check` should also return at least one result for the configured query. Together, these confirm the Lyzr Studio side is connected to populated Qdrant-backed MeetingMate memory.
+Expected result: `lyzr_rag_check` is `ok`, `vector_store_provider` contains `Qdrant`, and `collection_name` contains the configured `LYZR_RAG_COLLECTION` value. `lyzr_sync_qdrant_decisions` should submit the current Qdrant decisions as raw text training data for the configured Lyzr KB. `lyzr_rag_retrieve_check` should then return at least one result for the configured query. Together, these confirm the Lyzr Studio side is connected to populated Qdrant-backed MeetingMate memory.
+
+Use `LYZR_SYNC_DRY_RUN=1` to preview the number of Qdrant decisions that would be submitted without writing to Lyzr.
 
 Verify a real Lyzr Studio agent invocation against that Knowledge Base:
 

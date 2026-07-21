@@ -75,6 +75,7 @@ To verify a Lyzr Studio Knowledge Base/RAG config that points at Qdrant, set `LY
 
 ```bash
 python scripts/lyzr_rag_check.py
+python scripts/lyzr_sync_qdrant_decisions.py
 python scripts/lyzr_rag_retrieve_check.py
 ```
 
