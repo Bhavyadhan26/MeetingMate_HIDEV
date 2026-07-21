@@ -72,7 +72,7 @@ decisionsEl.addEventListener("click", async (event) => {
   await fetch(`${API}/v1/decisions/${id}/resolve`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ resolver: "Team Lead", note: "Acknowledged and resolved in demo." })
+    body: JSON.stringify({ resolver: "Team Lead", resolver_role: "team_lead", note: "Acknowledged and resolved in demo." })
   });
   event.target.closest(".decision").querySelector(".badge").textContent = "resolved";
   event.target.remove();

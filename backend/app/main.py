@@ -6,7 +6,7 @@ try:
 except Exception:  # pragma: no cover
     FastAPI = None
 
-from backend.app.api.routes import pre_meeting_brief, process_transcript, resolve_decision, search_memory
+from backend.app.api.routes import list_unresolved_conflicts, pre_meeting_brief, process_transcript, resolve_decision_with_role, search_memory
 from backend.app.services.errors import AppError
 
 
@@ -29,12 +29,21 @@ if FastAPI:
     @app.post("/v1/decisions/{decision_id}/resolve")
     def decision_resolve(decision_id: str, payload: dict) -> dict:
         def run() -> dict:
-            result = resolve_decision(decision_id, payload.get("resolver", "Team Lead"), payload.get("note", "Resolved by human review."))
+            result = resolve_decision_with_role(
+                decision_id,
+                payload.get("resolver", "Team Lead"),
+                payload.get("note", "Resolved by human review."),
+                payload.get("resolver_role", "team_lead"),
+            )
             if "error" in result:
                 raise HTTPException(status_code=404, detail=result["error"])
             return result
 
         return _handle_app_error(run)
+
+    @app.get("/v1/decisions/conflicts")
+    def decision_conflicts(team_id: str = "demo-team") -> dict:
+        return _handle_app_error(lambda: list_unresolved_conflicts(team_id))
 
 
     def _handle_app_error(operation: object) -> dict:

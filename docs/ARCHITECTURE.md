@@ -26,3 +26,5 @@ The local mode is intentionally deterministic so the phase gates can be tested w
 ## Failure Handling
 
 Malformed transcript and agenda payloads return structured `400` responses. Runtime dependency failures such as Qdrant connection loss are retried with exponential backoff in the Qdrant adapter and surfaced as structured `503` responses. Provider quota/rate-limit errors are classified as structured `429` responses so the UI can show a retryable state instead of a raw server error.
+
+Conflict resolution has a simple MVP authorization boundary: `/v1/decisions/{id}/resolve` accepts only roles listed in `CONFLICT_RESOLVER_ROLES` and defaults to `team_lead`, `decision_owner`, and `admin`. `/v1/decisions/conflicts` lists unresolved conflicts for a team, annotates whether each has exceeded `CONFLICT_ESCALATION_HOURS`, and logs an escalation trace for expired conflicts.

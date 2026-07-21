@@ -1,5 +1,7 @@
 import os
+import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 try:
@@ -8,7 +10,9 @@ except Exception:  # pragma: no cover
     TestClient = None
 
 from backend.app.memory.vector_store import QdrantVectorMemory
+from backend.app.models import Decision
 from backend.app.services.errors import (
+    AuthorizationError,
     DependencyUnavailableError,
     ProviderRateLimitedError,
     classify_processing_error,
@@ -53,6 +57,38 @@ class HardeningTests(unittest.TestCase):
         with patch.dict(os.environ, {"QDRANT_RETRY_ATTEMPTS": "3", "QDRANT_RETRY_DELAY_SECONDS": "0"}, clear=False):
             self.assertEqual(memory._with_retry("unit_test", operation), "ok")
         self.assertEqual(calls["count"], 3)
+
+    def test_resolution_rejects_unprivileged_role(self) -> None:
+        from backend.app.api.routes import resolve_decision_with_role
+
+        with self.assertRaises(AuthorizationError):
+            resolve_decision_with_role("decision-1", "Observer", "Not authorized.", "observer")
+
+    def test_conflict_audit_marks_expired_unresolved_conflict(self) -> None:
+        from backend.app.api import routes
+        from backend.app.memory.vector_store import LocalVectorMemory
+
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp.close()
+        os.unlink(tmp.name)
+        try:
+            memory = LocalVectorMemory(tmp.name)
+            decision = Decision(
+                meeting_id="meeting-old-conflict",
+                team_id="audit-team",
+                text="no longer use Qdrant",
+                source_excerpt="Decision: no longer use Qdrant.",
+                status="conflicted",
+            )
+            memory.upsert_decision(decision)
+            memory.update_decision(decision.id, created_at=(datetime.now(timezone.utc) - timedelta(hours=25)).isoformat())
+            with patch.object(routes, "memory", memory), patch.dict(os.environ, {"CONFLICT_ESCALATION_HOURS": "24"}, clear=False):
+                result = routes.list_unresolved_conflicts("audit-team")
+            self.assertEqual(len(result["conflicts"]), 1)
+            self.assertTrue(result["conflicts"][0]["escalation"]["expired"])
+        finally:
+            if os.path.exists(tmp.name):
+                os.unlink(tmp.name)
 
 
 if __name__ == "__main__":

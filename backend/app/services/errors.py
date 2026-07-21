@@ -34,6 +34,11 @@ class ProviderRateLimitedError(AppError):
     code = "provider_rate_limited"
 
 
+class AuthorizationError(AppError):
+    status_code = 403
+    code = "authorization_failed"
+
+
 def classify_processing_error(exc: Exception, operation: str) -> AppError:
     message = str(exc)
     lowered = message.lower()

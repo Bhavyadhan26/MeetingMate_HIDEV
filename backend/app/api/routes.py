@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import os
+from datetime import datetime, timezone
 from typing import Any, Dict
 from uuid import uuid4
 
 from backend.app.agents.recall_agent import RecallAgent
 from backend.app.memory import get_memory
+from backend.app.observability import trace_event
 from backend.app.services import MeetingPipeline
-from backend.app.services.errors import MalformedTranscriptError, classify_processing_error
+from backend.app.services.errors import AuthorizationError, MalformedTranscriptError, classify_processing_error
 
 memory = get_memory()
 pipeline = MeetingPipeline(memory)
@@ -58,13 +61,45 @@ def pre_meeting_brief(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def resolve_decision(decision_id: str, resolver: str, note: str) -> Dict[str, Any]:
+    return resolve_decision_with_role(decision_id, resolver, note, "team_lead")
+
+
+def resolve_decision_with_role(decision_id: str, resolver: str, note: str, resolver_role: str) -> Dict[str, Any]:
+    if resolver_role not in _allowed_resolution_roles():
+        raise AuthorizationError(
+            "Only team leads, decision owners, or admins can resolve conflicts.",
+            detail={"resolver_role": resolver_role, "decision_id": decision_id},
+        )
     try:
         updated = memory.update_decision(decision_id, status="resolved", resolved_by=resolver, resolution_note=note)
     except Exception as exc:
         raise classify_processing_error(exc, "decision_resolve") from exc
     if not updated:
         return {"error": "Decision not found", "decision_id": decision_id}
+    trace_event("conflict_resolution", "resolved", {"decision_id": decision_id, "resolver": resolver, "resolver_role": resolver_role})
     return {"decision": updated}
+
+
+def list_unresolved_conflicts(team_id: str = "demo-team") -> Dict[str, Any]:
+    try:
+        conflicts = memory.list_decisions(team_id=team_id, status="conflicted", limit=100)
+    except Exception as exc:
+        raise classify_processing_error(exc, "conflict_list") from exc
+    timeout_hours = float(os.getenv("CONFLICT_ESCALATION_HOURS", "24"))
+    escalated = [_annotate_escalation(decision, timeout_hours) for decision in conflicts]
+    for decision in escalated:
+        if decision["escalation"]["expired"]:
+            trace_event(
+                "conflict_resolution",
+                "escalated",
+                {
+                    "decision_id": decision["id"],
+                    "team_id": team_id,
+                    "age_hours": decision["escalation"]["age_hours"],
+                    "timeout_hours": timeout_hours,
+                },
+            )
+    return {"team_id": team_id, "conflicts": escalated, "timeout_hours": timeout_hours}
 
 
 def _string_list(value: Any, field_name: str) -> list[str]:
@@ -80,3 +115,38 @@ def _string_list(value: Any, field_name: str) -> list[str]:
         if stripped:
             result.append(stripped)
     return result
+
+
+def _allowed_resolution_roles() -> set[str]:
+    raw = os.getenv("CONFLICT_RESOLVER_ROLES", "team_lead,decision_owner,admin")
+    return {role.strip() for role in raw.split(",") if role.strip()}
+
+
+def _annotate_escalation(decision: Dict[str, Any], timeout_hours: float) -> Dict[str, Any]:
+    created_at = _parse_datetime(decision.get("created_at"))
+    age_hours = 0.0
+    if created_at is not None:
+        age_hours = max(0.0, (datetime.now(timezone.utc) - created_at).total_seconds() / 3600)
+    annotated = dict(decision)
+    annotated["escalation"] = {
+        "expired": age_hours >= timeout_hours,
+        "age_hours": round(age_hours, 2),
+        "timeout_hours": timeout_hours,
+        "behavior": "log conflict_resolution.escalated trace event for reviewer follow-up",
+    }
+    return annotated
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str) and value:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)

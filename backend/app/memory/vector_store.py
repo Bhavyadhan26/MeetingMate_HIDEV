@@ -28,6 +28,9 @@ class VectorMemory(Protocol):
     def search_decisions(self, query: str, team_id: str, limit: int = 5, status: Optional[str] = None) -> List[Dict[str, Any]]:
         ...
 
+    def list_decisions(self, team_id: str, status: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        ...
+
 
 class LocalVectorMemory:
     def __init__(self, path: str = "backend/app/memory/local_ledger.json") -> None:
@@ -76,6 +79,19 @@ class LocalVectorMemory:
             scored["score"] = cosine(query_vector, item.get("vector", []))
             results.append(scored)
         return sorted(results, key=lambda item: item["score"], reverse=True)[:limit]
+
+    def list_decisions(self, team_id: str, status: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        data = self._load()
+        results: List[Dict[str, Any]] = []
+        for item in data["decisions"]:
+            if item.get("team_id") != team_id:
+                continue
+            if status and item.get("status") != status:
+                continue
+            payload = dict(item)
+            payload.pop("vector", None)
+            results.append(payload)
+        return sorted(results, key=lambda item: str(item.get("created_at", "")), reverse=True)[:limit]
 
 
 class QdrantVectorMemory:
@@ -185,6 +201,25 @@ class QdrantVectorMemory:
             payload["score"] = float(hit.score)
             results.append(payload)
         return results
+
+    def list_decisions(self, team_id: str, status: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        FieldCondition = self._models.FieldCondition
+        Filter = self._models.Filter
+        MatchValue = self._models.MatchValue
+        conditions = [FieldCondition(key="team_id", match=MatchValue(value=team_id))]
+        if status:
+            conditions.append(FieldCondition(key="status", match=MatchValue(value=status)))
+        points, _ = self._with_retry(
+            "list_decisions",
+            lambda: self.client.scroll(
+                collection_name=DECISIONS_COLLECTION,
+                scroll_filter=Filter(must=conditions),
+                limit=limit,
+                with_payload=True,
+            ),
+        )
+        results = [dict(point.payload or {}) for point in points]
+        return sorted(results, key=lambda item: str(item.get("created_at", "")), reverse=True)
 
 
 def get_memory() -> VectorMemory:
