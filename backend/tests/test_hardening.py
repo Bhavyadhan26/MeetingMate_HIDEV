@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
@@ -38,6 +39,37 @@ class HardeningTests(unittest.TestCase):
             response = TestClient(app).get("/v1/memory/search?query=qdrant&team_id=platform")
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["detail"]["code"], "dependency_unavailable")
+
+    def test_async_transcript_job_completes_with_pollable_result(self) -> None:
+        if TestClient is None:
+            self.skipTest("FastAPI test client is not installed.")
+        from backend.app.main import app
+
+        client = TestClient(app)
+        response = client.post(
+            "/v1/transcripts/async",
+            json={
+                "title": "Async path",
+                "team_id": "async-test",
+                "transcript": "We decided use Qdrant for async job memory.",
+                "attendees": [],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        job_id = response.json()["job_id"]
+
+        final = None
+        for _ in range(120):
+            polled = client.get(f"/v1/transcripts/jobs/{job_id}")
+            self.assertEqual(polled.status_code, 200)
+            payload = polled.json()
+            if payload["status"] == "completed":
+                final = payload
+                break
+            time.sleep(0.25)
+
+        self.assertIsNotNone(final)
+        self.assertEqual(final["result"]["decisions"][0]["text"], "use Qdrant for async job memory")
 
     def test_rate_limit_exception_is_classified(self) -> None:
         error = classify_processing_error(RuntimeError("429 rate limit from model provider"), "transcript_ingest")

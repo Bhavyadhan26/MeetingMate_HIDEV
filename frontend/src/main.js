@@ -23,8 +23,8 @@ function renderDecision(decision) {
 
 document.querySelector("#upload-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  statusEl.textContent = "Processing";
-  const response = await fetch(`${API}/v1/transcripts`, {
+  statusEl.textContent = "Queued";
+  const response = await fetch(`${API}/v1/transcripts/async`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -35,10 +35,43 @@ document.querySelector("#upload-form").addEventListener("submit", async (event) 
       agenda: ["memory ledger"]
     })
   });
-  const result = await response.json();
-  decisionsEl.innerHTML = result.decisions.map(renderDecision).join("");
-  statusEl.textContent = `Trace ${result.trace_id}`;
+  const job = await response.json();
+  if (!response.ok) {
+    showError(job);
+    return;
+  }
+  pollJob(job.job_id);
 });
+
+async function pollJob(jobId) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const response = await fetch(`${API}/v1/transcripts/jobs/${jobId}`);
+    const job = await response.json();
+    if (!response.ok) {
+      showError(job);
+      return;
+    }
+    statusEl.textContent = job.status === "processing" ? "Processing" : "Queued";
+    if (job.status === "completed") {
+      const result = job.result;
+      decisionsEl.innerHTML = result.decisions.map(renderDecision).join("");
+      statusEl.textContent = `Trace ${result.trace_id}`;
+      return;
+    }
+    if (job.status === "failed") {
+      showError(job.error);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  statusEl.textContent = "Timed out";
+}
+
+function showError(error) {
+  const detail = error.detail || error;
+  statusEl.textContent = detail.code || "Error";
+  answerEl.innerHTML = `<p>${detail.message || "Request failed."}</p>`;
+}
 
 document.querySelector("#search").addEventListener("click", async () => {
   const query = encodeURIComponent(document.querySelector("#query").value);

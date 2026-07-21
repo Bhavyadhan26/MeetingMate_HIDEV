@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from threading import Lock
 from typing import Any, Dict
 from uuid import uuid4
 
@@ -9,21 +11,52 @@ from backend.app.agents.recall_agent import RecallAgent
 from backend.app.memory import get_memory
 from backend.app.observability import trace_event
 from backend.app.services import MeetingPipeline
-from backend.app.services.errors import AuthorizationError, MalformedTranscriptError, classify_processing_error
+from backend.app.services.errors import AppError, AuthorizationError, MalformedTranscriptError, classify_processing_error
 
 memory = get_memory()
 pipeline = MeetingPipeline(memory)
 recall = RecallAgent(memory)
+_jobs: Dict[str, Dict[str, Any]] = {}
+_jobs_lock = Lock()
+_executor = ThreadPoolExecutor(max_workers=int(os.getenv("TRANSCRIPT_JOB_WORKERS", "2")))
 
 
 def process_transcript(payload: Dict[str, Any]) -> Dict[str, Any]:
-    transcript = payload.get("transcript")
-    if not isinstance(transcript, str) or not transcript.strip():
-        raise MalformedTranscriptError("transcript must be a non-empty string")
+    return _process_transcript_payload(payload).model_dump()
+
+
+def enqueue_transcript(payload: Dict[str, Any]) -> Dict[str, Any]:
+    _validate_transcript_payload(payload)
+    job_id = f"job-{uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
+    job = {
+        "job_id": job_id,
+        "status": "queued",
+        "created_at": now,
+        "updated_at": now,
+        "result": None,
+        "error": None,
+    }
+    with _jobs_lock:
+        _jobs[job_id] = job
+    _executor.submit(_run_transcript_job, job_id, dict(payload))
+    return dict(job)
+
+
+def get_transcript_job(job_id: str) -> Dict[str, Any]:
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return {"error": "Job not found", "job_id": job_id}
+        return dict(job)
+
+
+def _process_transcript_payload(payload: Dict[str, Any]) -> Any:
+    transcript = _validate_transcript_payload(payload)
     attendees = _string_list(payload.get("attendees", []), "attendees")
     agenda = _string_list(payload.get("agenda", []), "agenda")
     try:
-        result = pipeline.process(
+        return pipeline.process(
             title=str(payload.get("title", "Untitled meeting")),
             team_id=str(payload.get("team_id", "demo-team")),
             transcript_text=transcript,
@@ -32,7 +65,31 @@ def process_transcript(payload: Dict[str, Any]) -> Dict[str, Any]:
         )
     except Exception as exc:
         raise classify_processing_error(exc, "transcript_ingest") from exc
-    return result.model_dump()
+
+
+def _validate_transcript_payload(payload: Dict[str, Any]) -> str:
+    transcript = payload.get("transcript")
+    if not isinstance(transcript, str) or not transcript.strip():
+        raise MalformedTranscriptError("transcript must be a non-empty string")
+    return transcript
+
+
+def _run_transcript_job(job_id: str, payload: Dict[str, Any]) -> None:
+    _update_job(job_id, status="processing", updated_at=datetime.now(timezone.utc).isoformat())
+    try:
+        result = _process_transcript_payload(payload).model_dump()
+        _update_job(job_id, status="completed", result=result, error=None, updated_at=datetime.now(timezone.utc).isoformat())
+    except AppError as exc:
+        _update_job(job_id, status="failed", result=None, error=exc.to_detail(), updated_at=datetime.now(timezone.utc).isoformat())
+    except Exception as exc:
+        error = classify_processing_error(exc, "transcript_ingest").to_detail()
+        _update_job(job_id, status="failed", result=None, error=error, updated_at=datetime.now(timezone.utc).isoformat())
+
+
+def _update_job(job_id: str, **fields: Any) -> None:
+    with _jobs_lock:
+        if job_id in _jobs:
+            _jobs[job_id].update(fields)
 
 
 def search_memory(query: str, team_id: str = "demo-team") -> Dict[str, Any]:

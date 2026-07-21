@@ -10,6 +10,8 @@ The system is organized as a transcript-to-memory pipeline.
 6. `backend/app/observability/tracing.py` emits an inspectable trace for each agent step and carries the Lyzr OTLP endpoint configuration.
 7. `backend/app/services/errors.py` defines stable API error payloads for malformed input, dependency outages, and provider rate limits.
 
+Transcript ingestion has two API modes. `POST /v1/transcripts` remains a synchronous compatibility path for scripts and tests. `POST /v1/transcripts/async` creates an in-process job and `GET /v1/transcripts/jobs/{job_id}` returns `queued`, `processing`, `completed`, or `failed` state for the UI polling flow. This keeps the MVP dependency-light while making processing status real; production can replace the in-process executor with Celery/Redis behind the same job contract.
+
 The external documentation used for alignment is current as of 2026-07-21: Google ADK exposes build/run guidance for Python agents and multi-agent workflows, Google Cloud's MCP overview describes MCP hosts/clients/servers and remote HTTP servers, Qdrant quickstart covers local Docker usage, and Lyzr documents enterprise agent observability/integration concepts.
 
 The local mode is intentionally deterministic so the phase gates can be tested without API keys. Production deployment should set `MEMORY_BACKEND=qdrant` and export traces to Lyzr via `LYZR_OTLP_ENDPOINT`. OTLP authentication can be supplied with either `LYZR_API_KEY` for a bearer token or `LYZR_OTLP_HEADERS` for JSON/key-value headers required by the target collector.
