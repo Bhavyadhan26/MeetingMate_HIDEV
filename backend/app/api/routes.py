@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any, Dict
 from uuid import uuid4
@@ -19,6 +19,7 @@ recall = RecallAgent(memory)
 _jobs: Dict[str, Dict[str, Any]] = {}
 _jobs_lock = Lock()
 _executor = ThreadPoolExecutor(max_workers=int(os.getenv("TRANSCRIPT_JOB_WORKERS", "2")))
+_TERMINAL_JOB_STATUSES = {"completed", "failed"}
 
 
 def process_transcript(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -34,10 +35,12 @@ def enqueue_transcript(payload: Dict[str, Any]) -> Dict[str, Any]:
         "status": "queued",
         "created_at": now,
         "updated_at": now,
+        "expires_at": None,
         "result": None,
         "error": None,
     }
     with _jobs_lock:
+        _purge_expired_jobs_locked()
         _jobs[job_id] = job
     _executor.submit(_run_transcript_job, job_id, dict(payload))
     return dict(job)
@@ -45,6 +48,7 @@ def enqueue_transcript(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def get_transcript_job(job_id: str) -> Dict[str, Any]:
     with _jobs_lock:
+        _purge_expired_jobs_locked()
         job = _jobs.get(job_id)
         if not job:
             return {"error": "Job not found", "job_id": job_id}
@@ -78,18 +82,51 @@ def _run_transcript_job(job_id: str, payload: Dict[str, Any]) -> None:
     _update_job(job_id, status="processing", updated_at=datetime.now(timezone.utc).isoformat())
     try:
         result = _process_transcript_payload(payload).model_dump()
-        _update_job(job_id, status="completed", result=result, error=None, updated_at=datetime.now(timezone.utc).isoformat())
+        _finish_job(job_id, status="completed", result=result, error=None)
     except AppError as exc:
-        _update_job(job_id, status="failed", result=None, error=exc.to_detail(), updated_at=datetime.now(timezone.utc).isoformat())
+        _finish_job(job_id, status="failed", result=None, error=exc.to_detail())
     except Exception as exc:
         error = classify_processing_error(exc, "transcript_ingest").to_detail()
-        _update_job(job_id, status="failed", result=None, error=error, updated_at=datetime.now(timezone.utc).isoformat())
+        _finish_job(job_id, status="failed", result=None, error=error)
+
+
+def _finish_job(job_id: str, status: str, result: Any, error: Any) -> None:
+    now = datetime.now(timezone.utc)
+    _update_job(
+        job_id,
+        status=status,
+        result=result,
+        error=error,
+        updated_at=now.isoformat(),
+        expires_at=(now + timedelta(seconds=_job_ttl_seconds())).isoformat(),
+    )
 
 
 def _update_job(job_id: str, **fields: Any) -> None:
     with _jobs_lock:
         if job_id in _jobs:
             _jobs[job_id].update(fields)
+
+
+def _job_ttl_seconds() -> int:
+    try:
+        ttl_seconds = int(os.getenv("TRANSCRIPT_JOB_TTL_SECONDS", "3600"))
+    except ValueError:
+        ttl_seconds = 3600
+    return max(1, ttl_seconds)
+
+
+def _purge_expired_jobs_locked(now: datetime | None = None) -> None:
+    current = now or datetime.now(timezone.utc)
+    expired_ids: list[str] = []
+    for job_id, job in _jobs.items():
+        if job.get("status") not in _TERMINAL_JOB_STATUSES:
+            continue
+        expires_at = _parse_datetime(job.get("expires_at"))
+        if expires_at is not None and expires_at <= current:
+            expired_ids.append(job_id)
+    for job_id in expired_ids:
+        del _jobs[job_id]
 
 
 def search_memory(query: str, team_id: str = "demo-team") -> Dict[str, Any]:
