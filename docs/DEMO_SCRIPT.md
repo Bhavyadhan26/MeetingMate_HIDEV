@@ -2,6 +2,17 @@
 
 1. Start the backend and frontend with `docker compose up --build`.
 2. Open `http://localhost:5173`.
+
+To verify the full API-backed walkthrough without manual clicks, run:
+
+```bash
+python scripts/demo_walkthrough.py
+```
+
+Expected result: JSON output includes `demo_walkthrough: ok`, one conflicted decision that resolves to `resolved`, recall citations, brief citations, and an inspectable Qdrant `decisions` collection.
+
+Manual UI walkthrough:
+
 3. Process this first transcript:
 
 ```text
