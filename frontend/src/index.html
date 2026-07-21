@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Chief of Staff</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <h1>AI Chief of Staff</h1>
+          <p>Meeting command center for decisions, drift, and organizational recall.</p>
+        </div>
+        <span id="status" class="status">Ready</span>
+      </section>
+
+      <section class="workspace">
+        <form id="upload-form" class="panel">
+          <h2>Transcript</h2>
+          <input id="title" value="Platform architecture sync" aria-label="Meeting title" />
+          <input id="team" value="demo-team" aria-label="Team id" />
+          <textarea id="transcript" aria-label="Transcript">Asha Rao: We decided use Qdrant as the persistent vector ledger. Marco will prepare the ingestion checklist by Friday.</textarea>
+          <button type="submit">Process Meeting</button>
+        </form>
+
+        <section class="panel">
+          <h2>Recall</h2>
+          <div class="search-row">
+            <input id="query" value="What did we decide about Qdrant?" aria-label="Search memory" />
+            <button id="search" type="button">Search</button>
+          </div>
+          <div id="answer" class="answer"></div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <h2>Decisions</h2>
+        <div id="decisions" class="decision-list"></div>
+      </section>
+    </main>
+    <script src="./main.js"></script>
+  </body>
+</html>
