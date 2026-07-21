@@ -139,3 +139,24 @@ class ProcessingResult(BaseModel):
     decisions: List[Decision]
     possible_decisions: List[PossibleDecision] = Field(default_factory=list)
     trace_id: str
+
+
+class DecisionCitation(BaseModel):
+    decision_id: str
+    text: str
+    source_excerpt: str
+    status: str
+    score: float
+
+
+class AgendaTopicBrief(BaseModel):
+    topic: str
+    summary: str
+    citations: List[DecisionCitation] = Field(default_factory=list)
+
+
+class PreMeetingBrief(BaseModel):
+    team_id: str
+    agenda: List[str]
+    topics: List[AgendaTopicBrief] = Field(default_factory=list)
+    trace_id: str

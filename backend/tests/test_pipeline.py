@@ -63,6 +63,15 @@ class PipelineTests(unittest.TestCase):
         self.assertGreaterEqual(len(answer["citations"]), 1)
         self.assertIn("source_excerpt", answer["citations"][0])
 
+    def test_pre_meeting_brief_returns_agenda_citations(self) -> None:
+        self.pipeline.process("Architecture sync", "platform", "We decided use Qdrant as the vector ledger.", attendees=[])
+        brief = RecallAgent(self.memory).pre_meeting_brief(["Qdrant ledger", ""], "platform", "trace-brief-test")
+        self.assertEqual(brief.team_id, "platform")
+        self.assertEqual(brief.agenda, ["Qdrant ledger"])
+        self.assertEqual(len(brief.topics), 1)
+        self.assertGreaterEqual(len(brief.topics[0].citations), 1)
+        self.assertIn("Qdrant", brief.topics[0].citations[0].source_excerpt)
+
 
 if __name__ == "__main__":
     unittest.main()

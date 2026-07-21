@@ -40,5 +40,7 @@ POST /v1/transcripts first meeting -> active decision persisted through Qdrant
 POST /v1/transcripts reversal -> Potential Conflict with prior_decision_id
 POST /v1/decisions/{id}/resolve -> status resolved
 GET /v1/memory/search -> cited active and resolved decisions
+POST /v1/briefs/pre-meeting -> agenda topic 'Qdrant ledger' returned 1 cited prior decision with source excerpt
 UI verification -> process, conflict display, resolve, and search all rendered correctly
+UI brief verification -> clicking Brief rendered 'Qdrant ledger' with 1 cited active decision
 ```

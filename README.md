@@ -82,6 +82,8 @@ python scripts/seed_demo_data.py
 
 Then open the UI, process a transcript that reverses the Qdrant decision, and search for Qdrant in recall.
 
+The UI also includes a pre-meeting brief panel. Enter agenda topics such as `Qdrant ledger` after seeding or processing meetings; the backend calls `/v1/briefs/pre-meeting` and returns cited prior decisions for each topic.
+
 ## Eval
 
 ```bash

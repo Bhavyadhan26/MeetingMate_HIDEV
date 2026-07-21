@@ -2,6 +2,7 @@ const API = "http://localhost:8000";
 const statusEl = document.querySelector("#status");
 const decisionsEl = document.querySelector("#decisions");
 const answerEl = document.querySelector("#answer");
+const briefEl = document.querySelector("#brief-output");
 
 function badge(status) {
   return `<span class="badge ${status}">${status}</span>`;
@@ -45,6 +46,24 @@ document.querySelector("#search").addEventListener("click", async () => {
   const response = await fetch(`${API}/v1/memory/search?query=${query}&team_id=${team}`);
   const result = await response.json();
   answerEl.innerHTML = `<p>${result.answer}</p>${(result.citations || []).map((item) => `<p><strong>${item.status}</strong> ${item.text}</p>`).join("")}`;
+});
+
+document.querySelector("#brief").addEventListener("click", async () => {
+  const agenda = document.querySelector("#agenda").value.split(",").map((item) => item.trim()).filter(Boolean);
+  const response = await fetch(`${API}/v1/briefs/pre-meeting`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      team_id: document.querySelector("#team").value,
+      agenda
+    })
+  });
+  const result = await response.json();
+  briefEl.innerHTML = (result.topics || []).map((topic) => `<article class="brief-topic">
+    <h3>${topic.topic}</h3>
+    <p>${topic.summary}</p>
+    ${(topic.citations || []).map((item) => `<p><strong>${item.status}</strong> ${item.text}</p>`).join("")}
+  </article>`).join("");
 });
 
 decisionsEl.addEventListener("click", async (event) => {

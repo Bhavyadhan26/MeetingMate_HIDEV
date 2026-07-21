@@ -101,6 +101,12 @@ button {
   padding: 14px;
 }
 
+.brief-topic {
+  border-top: 1px solid #d9e0e4;
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
 .conflicted, .potential-conflict {
   background: #fee2e2;
   color: #991b1b;

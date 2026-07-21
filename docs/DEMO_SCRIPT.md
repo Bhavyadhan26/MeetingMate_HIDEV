@@ -30,11 +30,19 @@ What did we decide about Qdrant?
 
 Expected result: the recall answer cites the relevant source excerpts.
 
-7. Inspect `backend/app/observability/local_traces.jsonl` in local mode, or the configured OTLP/Lyzr sink when `LYZR_OTLP_ENDPOINT` is set.
+7. Generate a pre-meeting brief with this agenda topic:
+
+```text
+Qdrant ledger
+```
+
+Expected result: the brief topic cites the prior Qdrant decision with its source excerpt.
+
+8. Inspect `backend/app/observability/local_traces.jsonl` in local mode, or the configured OTLP/Lyzr sink when `LYZR_OTLP_ENDPOINT` is set.
 
 Expected result: trace records exist for manager, summarizer, action item extractor, decision extractor, decision drift, and recall.
 
-8. Verify the OTLP exporter path from inside the backend container:
+9. Verify the OTLP exporter path from inside the backend container:
 
 ```bash
 docker compose exec backend python -m backend.app.observability.otlp_smoke
@@ -42,7 +50,7 @@ docker compose exec backend python -m backend.app.observability.otlp_smoke
 
 Expected result: JSON output includes a request with `path` `/v1/traces`, `content_type` `application/x-protobuf`, and non-zero `content_length`.
 
-9. Confirm Qdrant contains decisions:
+10. Confirm Qdrant contains decisions:
 
 ```bash
 curl http://localhost:6333/collections/decisions

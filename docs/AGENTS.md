@@ -59,3 +59,5 @@ Potential conflicts are written as `status=conflicted` and include the prior dec
 File: `backend/app/agents/recall_agent.py`
 
 Embeds the query, searches memory, and returns a grounded answer with decision citations and source excerpts.
+
+The same agent generates pre-meeting briefs through `/v1/briefs/pre-meeting`: each agenda topic is embedded, matched against prior team decisions, and returned with cited source excerpts so the brief can be inspected rather than trusted as free-form prose.

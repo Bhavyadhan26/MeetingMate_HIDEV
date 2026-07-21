@@ -6,7 +6,7 @@ try:
 except Exception:  # pragma: no cover
     FastAPI = None
 
-from backend.app.api.routes import process_transcript, resolve_decision, search_memory
+from backend.app.api.routes import pre_meeting_brief, process_transcript, resolve_decision, search_memory
 
 
 if FastAPI:
@@ -22,6 +22,13 @@ if FastAPI:
     @app.get("/v1/memory/search")
     def memory_search(query: str, team_id: str = "demo-team") -> dict:
         return search_memory(query, team_id)
+
+    @app.post("/v1/briefs/pre-meeting")
+    def brief_pre_meeting(payload: dict) -> dict:
+        agenda = payload.get("agenda", [])
+        if not agenda:
+            raise HTTPException(status_code=400, detail="agenda is required")
+        return pre_meeting_brief(payload)
 
     @app.post("/v1/decisions/{decision_id}/resolve")
     def decision_resolve(decision_id: str, payload: dict) -> dict:
