@@ -88,6 +88,18 @@ class Transcript(BaseModel):
     redaction_map: Dict[str, str] = Field(default_factory=dict)
 
 
+class MeetingChunk(BaseModel):
+    id: str = Field(default_factory=lambda: f"chunk-{uuid4().hex[:10]}")
+    meeting_id: str
+    team_id: str
+    speaker: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    text: str
+    redacted_text: str
+    source_index: int = 0
+
+
 class Summary(BaseModel):
     tldr: str
     key_points: List[str] = Field(default_factory=list)
@@ -135,6 +147,7 @@ class ProcessingResult(BaseModel):
     meeting: Meeting
     transcript: Transcript
     summary: Summary
+    meeting_chunks: List[MeetingChunk] = Field(default_factory=list)
     action_items: List[ActionItem]
     decisions: List[Decision]
     possible_decisions: List[PossibleDecision] = Field(default_factory=list)

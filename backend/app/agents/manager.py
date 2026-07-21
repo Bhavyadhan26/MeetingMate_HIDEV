@@ -9,7 +9,7 @@ from backend.app.agents.decision_drift_agent import DecisionDriftAgent
 from backend.app.agents.decision_extractor import DecisionExtractorAgent
 from backend.app.agents.summarizer import SummarizerAgent
 from backend.app.memory import LocalVectorMemory
-from backend.app.models import Meeting, ProcessingResult, Transcript
+from backend.app.models import Meeting, MeetingChunk, ProcessingResult, Transcript
 from backend.app.observability import trace_event
 
 
@@ -63,9 +63,34 @@ class MeetingAgentManager:
         else:
             summary, action_items, decisions, possible = self._run_threaded_extraction(meeting, transcript, trace_id)
 
+        meeting_chunks = [MeetingChunk(
+            meeting_id=meeting.id,
+            team_id=meeting.team_id,
+            text=transcript.raw_text,
+            redacted_text=transcript.redacted_text,
+            source_index=0,
+        )]
+        for chunk in meeting_chunks:
+            self.memory.upsert_meeting_chunk(chunk)
+        for action_item in action_items:
+            self.memory.upsert_action_item(action_item)
         persisted = [self.drift.write_with_status(decision, trace_id) for decision in decisions]
-        trace_event(self.name, "finish", {"trace_id": trace_id, "decisions": len(persisted), "action_items": len(action_items)})
-        return ProcessingResult(meeting=meeting, transcript=transcript, summary=summary, action_items=action_items, decisions=persisted, possible_decisions=possible, trace_id=trace_id)
+        trace_event(self.name, "finish", {
+            "trace_id": trace_id,
+            "decisions": len(persisted),
+            "action_items": len(action_items),
+            "meeting_chunks": len(meeting_chunks),
+        })
+        return ProcessingResult(
+            meeting=meeting,
+            transcript=transcript,
+            summary=summary,
+            meeting_chunks=meeting_chunks,
+            action_items=action_items,
+            decisions=persisted,
+            possible_decisions=possible,
+            trace_id=trace_id,
+        )
 
     def _run_threaded_extraction(self, meeting: Meeting, transcript: Transcript, trace_id: str):
         with ThreadPoolExecutor(max_workers=3) as pool:

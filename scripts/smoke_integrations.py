@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT))
 
 from backend.app.agents.adk_runtime import detect_adk_runtime
 from backend.app.memory.vector_store import LocalVectorMemory, QdrantVectorMemory
-from backend.app.models.schemas import Decision
+from backend.app.models.schemas import ActionItem, Decision, MeetingChunk
 from backend.app.observability import trace_event
 from backend.app.observability.otlp_smoke import run_otlp_smoke
 from backend.app.services.pipeline import MeetingPipeline
@@ -29,8 +29,25 @@ def smoke_local_memory() -> None:
         source_excerpt="We decided use Qdrant for vector memory.",
     )
     memory.upsert_decision(decision)
+    action = ActionItem(
+        meeting_id="meeting-smoke",
+        team_id="smoke",
+        task="document the Qdrant memory schema",
+        owner="Ravi",
+        source_excerpt="Ravi will document the Qdrant memory schema.",
+    )
+    chunk = MeetingChunk(
+        meeting_id="meeting-smoke",
+        team_id="smoke",
+        text="Ravi will document the Qdrant memory schema.",
+        redacted_text="[PERSON_1] will document the Qdrant memory schema.",
+    )
+    memory.upsert_action_item(action)
+    memory.upsert_meeting_chunk(chunk)
     hits = memory.search_decisions("vector memory", "smoke")
     assert hits and hits[0]["id"] == decision.id
+    assert memory.list_action_items("smoke")[0]["id"] == action.id
+    assert memory.list_meeting_chunks("smoke")[0]["id"] == chunk.id
     path.unlink(missing_ok=True)
     print("local_memory=ok")
 
@@ -47,8 +64,25 @@ def smoke_qdrant() -> None:
         source_excerpt="We decided use Qdrant for vector memory.",
     )
     memory.upsert_decision(decision)
+    action = ActionItem(
+        meeting_id="meeting-smoke",
+        team_id="smoke",
+        task="document the Qdrant memory schema",
+        owner="Ravi",
+        source_excerpt="Ravi will document the Qdrant memory schema.",
+    )
+    chunk = MeetingChunk(
+        meeting_id="meeting-smoke",
+        team_id="smoke",
+        text="Ravi will document the Qdrant memory schema.",
+        redacted_text="[PERSON_1] will document the Qdrant memory schema.",
+    )
+    memory.upsert_action_item(action)
+    memory.upsert_meeting_chunk(chunk)
     hits = memory.search_decisions("vector memory", "smoke")
     assert hits and hits[0]["id"] == decision.id
+    assert memory.list_action_items("smoke")[0]["id"] == action.id
+    assert memory.list_meeting_chunks("smoke")[0]["id"] == chunk.id
     print("qdrant=ok")
 
 

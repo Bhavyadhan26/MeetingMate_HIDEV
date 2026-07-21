@@ -56,6 +56,24 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(status, "conflicted")
         self.assertTrue(second.decisions[0].drift.prior_decision_id)
 
+    def test_pipeline_persists_actions_and_meeting_chunks(self) -> None:
+        result = self.pipeline.process(
+            "Delivery sync",
+            "delivery",
+            "Asha Rao: We decided use Qdrant as the vector ledger. Ravi will document schema by Friday.",
+            attendees=["Asha Rao", "Ravi Shah"],
+        )
+
+        actions = self.memory.list_action_items("delivery")
+        chunks = self.memory.list_meeting_chunks("delivery")
+
+        self.assertEqual(len(result.action_items), 1)
+        self.assertEqual(actions[0]["id"], result.action_items[0].id)
+        self.assertIn("document schema", actions[0]["task"])
+        self.assertEqual(len(result.meeting_chunks), 1)
+        self.assertEqual(chunks[0]["id"], result.meeting_chunks[0].id)
+        self.assertIn("[PERSON_1]", chunks[0]["redacted_text"])
+
     def test_recall_returns_cited_answer(self) -> None:
         self.pipeline.process("Product sync", "product", "We agreed launch beta in September.", attendees=[])
         answer = RecallAgent(self.memory).answer("What did we decide about beta launch?", "product", "trace-test")

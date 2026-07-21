@@ -36,6 +36,8 @@ Payload:
 - `deadline`
 - `source_excerpt`
 
+Vector: embedded from `task`. The manager persists every extracted action item to this collection immediately after extraction, before decision drift writes.
+
 ### `meeting_chunks`
 
 Payload:
@@ -47,6 +49,9 @@ Payload:
 - `end_time`
 - `text`
 - `redacted_text`
+- `source_index`
+
+Vector: embedded from `redacted_text` when present, otherwise `text`. The MVP stores one redacted transcript chunk per processed meeting so recall/drift extensions can ground future retrieval in the original meeting context without retaining PII in the vector text.
 
 ## Retention
 
@@ -62,4 +67,4 @@ set SMOKE_QDRANT=1
 python scripts/smoke_integrations.py
 ```
 
-Expected evidence: `qdrant=ok`.
+Expected evidence: `qdrant=ok`. The smoke now writes and reads `decisions`, `action_items`, and `meeting_chunks` so all three collection contracts are exercised.

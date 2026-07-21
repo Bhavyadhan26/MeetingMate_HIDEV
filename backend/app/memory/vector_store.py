@@ -22,6 +22,12 @@ class VectorMemory(Protocol):
     def upsert_decision(self, decision: Any) -> None:
         ...
 
+    def upsert_action_item(self, action_item: Any) -> None:
+        ...
+
+    def upsert_meeting_chunk(self, meeting_chunk: Any) -> None:
+        ...
+
     def update_decision(self, decision_id: str, **fields: Any) -> Optional[Dict[str, Any]]:
         ...
 
@@ -29,6 +35,12 @@ class VectorMemory(Protocol):
         ...
 
     def list_decisions(self, team_id: str, status: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        ...
+
+    def list_action_items(self, team_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        ...
+
+    def list_meeting_chunks(self, team_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         ...
 
 
@@ -54,6 +66,22 @@ class LocalVectorMemory:
         payload["vector"] = embed_text(payload["text"])
         data["decisions"] = [item for item in data["decisions"] if item["id"] != payload["id"]]
         data["decisions"].append(payload)
+        self._save(data)
+
+    def upsert_action_item(self, action_item: Any) -> None:
+        data = self._load()
+        payload = action_item.model_dump() if hasattr(action_item, "model_dump") else dict(action_item.__dict__)
+        payload["vector"] = embed_text(payload["task"])
+        data["action_items"] = [item for item in data["action_items"] if item["id"] != payload["id"]]
+        data["action_items"].append(payload)
+        self._save(data)
+
+    def upsert_meeting_chunk(self, meeting_chunk: Any) -> None:
+        data = self._load()
+        payload = meeting_chunk.model_dump() if hasattr(meeting_chunk, "model_dump") else dict(meeting_chunk.__dict__)
+        payload["vector"] = embed_text(payload.get("redacted_text") or payload["text"])
+        data["meeting_chunks"] = [item for item in data["meeting_chunks"] if item["id"] != payload["id"]]
+        data["meeting_chunks"].append(payload)
         self._save(data)
 
     def update_decision(self, decision_id: str, **fields: Any) -> Optional[Dict[str, Any]]:
@@ -93,6 +121,23 @@ class LocalVectorMemory:
             results.append(payload)
         return sorted(results, key=lambda item: str(item.get("created_at", "")), reverse=True)[:limit]
 
+    def _list_payloads(self, collection: str, team_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        data = self._load()
+        results: List[Dict[str, Any]] = []
+        for item in data[collection]:
+            if item.get("team_id") != team_id:
+                continue
+            payload = dict(item)
+            payload.pop("vector", None)
+            results.append(payload)
+        return results[:limit]
+
+    def list_action_items(self, team_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        return self._list_payloads("action_items", team_id, limit)
+
+    def list_meeting_chunks(self, team_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        return self._list_payloads("meeting_chunks", team_id, limit)
+
 
 class QdrantVectorMemory:
     """Qdrant-backed implementation of the same memory contract used locally."""
@@ -124,8 +169,10 @@ class QdrantVectorMemory:
                 raise RuntimeError(f"Could not initialize Qdrant collection {collection}: {last_error}") from last_error
 
     @staticmethod
-    def _point_id(decision_id: str) -> str:
-        return str(uuid5(NAMESPACE_URL, f"meetingmate:{decision_id}"))
+    def _point_id(item_id: str, namespace: str = DECISIONS_COLLECTION) -> str:
+        if namespace == DECISIONS_COLLECTION:
+            return str(uuid5(NAMESPACE_URL, f"meetingmate:{item_id}"))
+        return str(uuid5(NAMESPACE_URL, f"meetingmate:{namespace}:{item_id}"))
 
     def _with_retry(self, label: str, operation: Any) -> Any:
         attempts = int(os.getenv("QDRANT_RETRY_ATTEMPTS", "3"))
@@ -159,6 +206,32 @@ class QdrantVectorMemory:
             lambda: self.client.upsert(
                 collection_name=DECISIONS_COLLECTION,
                 points=[PointStruct(id=self._point_id(payload["id"]), vector=vector, payload=payload)],
+            ),
+        )
+
+    def upsert_action_item(self, action_item: Any) -> None:
+        PointStruct = self._models.PointStruct
+        payload = action_item.model_dump() if hasattr(action_item, "model_dump") else dict(action_item.__dict__)
+        vector = embed_text(payload["task"])
+        payload.pop("vector", None)
+        self._with_retry(
+            "upsert_action_item",
+            lambda: self.client.upsert(
+                collection_name=ACTION_ITEMS_COLLECTION,
+                points=[PointStruct(id=self._point_id(payload["id"], ACTION_ITEMS_COLLECTION), vector=vector, payload=payload)],
+            ),
+        )
+
+    def upsert_meeting_chunk(self, meeting_chunk: Any) -> None:
+        PointStruct = self._models.PointStruct
+        payload = meeting_chunk.model_dump() if hasattr(meeting_chunk, "model_dump") else dict(meeting_chunk.__dict__)
+        vector = embed_text(payload.get("redacted_text") or payload["text"])
+        payload.pop("vector", None)
+        self._with_retry(
+            "upsert_meeting_chunk",
+            lambda: self.client.upsert(
+                collection_name=MEETING_CHUNKS_COLLECTION,
+                points=[PointStruct(id=self._point_id(payload["id"], MEETING_CHUNKS_COLLECTION), vector=vector, payload=payload)],
             ),
         )
 
@@ -220,6 +293,27 @@ class QdrantVectorMemory:
         )
         results = [dict(point.payload or {}) for point in points]
         return sorted(results, key=lambda item: str(item.get("created_at", "")), reverse=True)
+
+    def _list_collection(self, collection: str, team_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        FieldCondition = self._models.FieldCondition
+        Filter = self._models.Filter
+        MatchValue = self._models.MatchValue
+        points, _ = self._with_retry(
+            f"list_{collection}",
+            lambda: self.client.scroll(
+                collection_name=collection,
+                scroll_filter=Filter(must=[FieldCondition(key="team_id", match=MatchValue(value=team_id))]),
+                limit=limit,
+                with_payload=True,
+            ),
+        )
+        return [dict(point.payload or {}) for point in points]
+
+    def list_action_items(self, team_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        return self._list_collection(ACTION_ITEMS_COLLECTION, team_id, limit)
+
+    def list_meeting_chunks(self, team_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        return self._list_collection(MEETING_CHUNKS_COLLECTION, team_id, limit)
 
 
 def get_memory() -> VectorMemory:

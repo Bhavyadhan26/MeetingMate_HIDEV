@@ -47,4 +47,6 @@ hardening tests -> malformed transcript returns structured 400, dependency outag
 live hardening check -> stopped Qdrant, GET /v1/memory/search returned 503 dependency_unavailable; restarted Qdrant/backend and ingest plus recall returned 200 with cited source excerpt
 conflict resolution guard -> unauthorized resolver role returns authorization_failed; GET /v1/decisions/conflicts marks conflicts older than CONFLICT_ESCALATION_HOURS and emits escalation traces
 live Phase 5 check -> conflict listed via GET /v1/decisions/conflicts, observer resolve returned 403 authorization_failed, team_lead resolve returned 200 resolved, unresolved conflict list returned 0
+live Qdrant collection check -> direct Qdrant adapter wrote/read decisions, action_items, and meeting_chunks for team live-88be84c8
+live HTTP ingest collection check -> POST /v1/transcripts wrote 1 decision, 1 action item, and 1 meeting chunk to Qdrant for team http-1228ef65
 ```
