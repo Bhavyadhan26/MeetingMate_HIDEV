@@ -69,7 +69,7 @@ Decision status lifecycle:
 
 Tables:
 - `meetings`: meeting id, team id, title, attendees JSON, agenda JSON, created timestamp.
-- `redaction_maps`: meeting id, team id, redaction map JSON. In production this is the sensitive table that should use database-level encryption at rest.
+- `redaction_maps`: meeting id, team id, AES-GCM-256 encrypted redaction map JSON. Set `REDACTION_MAP_ENCRYPTION_KEY` outside local development.
 - `transcript_jobs`: durable queue and job history for text/audio transcript processing.
 - `users`, `teams`, `team_memberships`: schema placeholders for auth/RBAC and team structure.
 

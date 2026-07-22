@@ -31,6 +31,9 @@ class VectorMemory(Protocol):
     def update_decision(self, decision_id: str, **fields: Any) -> Optional[Dict[str, Any]]:
         ...
 
+    def get_decision(self, decision_id: str) -> Optional[Dict[str, Any]]:
+        ...
+
     def search_decisions(self, query: str, team_id: str, limit: int = 5, status: Optional[str] = None) -> List[Dict[str, Any]]:
         ...
 
@@ -93,6 +96,14 @@ class LocalVectorMemory:
                 updated = item
         self._save(data)
         return updated
+
+    def get_decision(self, decision_id: str) -> Optional[Dict[str, Any]]:
+        for item in self._load()["decisions"]:
+            if item.get("id") == decision_id:
+                payload = dict(item)
+                payload.pop("vector", None)
+                return payload
+        return None
 
     def search_decisions(self, query: str, team_id: str, limit: int = 5, status: Optional[str] = None) -> List[Dict[str, Any]]:
         data = self._load()
@@ -309,6 +320,16 @@ class QdrantVectorMemory:
             lambda: self.client.set_payload(collection_name=DECISIONS_COLLECTION, payload=fields, points=[point_id]),
         )
         return updated
+
+    def get_decision(self, decision_id: str) -> Optional[Dict[str, Any]]:
+        point_id = self._point_id(decision_id)
+        points = self._with_retry(
+            "retrieve_decision",
+            lambda: self.client.retrieve(collection_name=DECISIONS_COLLECTION, ids=[point_id], with_payload=True),
+        )
+        if not points:
+            return None
+        return dict(points[0].payload or {})
 
     def search_decisions(self, query: str, team_id: str, limit: int = 5, status: Optional[str] = None) -> List[Dict[str, Any]]:
         FieldCondition = self._models.FieldCondition

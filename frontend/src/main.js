@@ -5,6 +5,7 @@ import {
   listConflicts,
   resolveDecisionConflict,
   searchMemory,
+  setAccessTokenProvider,
   submitTranscript,
   uploadAudio
 } from "./api/client.js";
@@ -17,8 +18,12 @@ const summaryEl = document.querySelector("#summary");
 const actionsEl = document.querySelector("#actions");
 const answerEl = document.querySelector("#answer");
 const briefEl = document.querySelector("#brief-output");
+const loginEl = document.querySelector("#login");
+const logoutEl = document.querySelector("#logout");
+const userEl = document.querySelector("#user");
 let currentDecisions = [];
 let currentConflicts = [];
+let auth0Client = null;
 
 function badge(status) {
   const value = String(status || "unknown");
@@ -42,6 +47,59 @@ function escapeHtml(value) {
 function parseList(value) {
   return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
 }
+
+async function initAuth() {
+  const backendConfig = await fetchAuthConfig();
+  const domain = backendConfig.domain || window.MEETINGMATE_AUTH0_DOMAIN;
+  const clientId = backendConfig.client_id || window.MEETINGMATE_AUTH0_CLIENT_ID;
+  const audience = backendConfig.audience || window.MEETINGMATE_AUTH0_AUDIENCE;
+  if (!domain || !clientId || !window.auth0) {
+    userEl.textContent = "Auth optional";
+    return;
+  }
+  auth0Client = await window.auth0.createAuth0Client({
+    domain,
+    clientId,
+    authorizationParams: {
+      audience,
+      redirect_uri: window.location.origin + window.location.pathname
+    }
+  });
+  if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
+    await auth0Client.handleRedirectCallback();
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  const authenticated = await auth0Client.isAuthenticated();
+  loginEl.hidden = authenticated;
+  logoutEl.hidden = !authenticated;
+  if (authenticated) {
+    const user = await auth0Client.getUser();
+    userEl.textContent = user.email || user.name || "Signed in";
+    setAccessTokenProvider(() => auth0Client.getTokenSilently());
+  } else {
+    userEl.textContent = "Signed out";
+  }
+}
+
+async function fetchAuthConfig() {
+  try {
+    const response = await fetch(`${window.MEETINGMATE_API_BASE || "http://localhost:8000"}/v1/auth/config`);
+    if (!response.ok) return {};
+    return response.json();
+  } catch {
+    return {};
+  }
+}
+
+loginEl.addEventListener("click", async () => {
+  if (!auth0Client) return;
+  await auth0Client.loginWithRedirect();
+});
+
+logoutEl.addEventListener("click", () => {
+  if (!auth0Client) return;
+  auth0Client.logout({ logoutParams: { returnTo: window.location.origin + window.location.pathname } });
+});
 
 function renderDecision(decision) {
   const drift = decision.drift ? decision.drift.label : "New";
@@ -262,3 +320,5 @@ function handleResolveClick(event) {
 
 decisionsEl.addEventListener("click", handleResolveClick);
 conflictsEl.addEventListener("click", handleResolveClick);
+
+initAuth().catch(showError);

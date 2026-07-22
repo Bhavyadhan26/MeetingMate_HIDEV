@@ -31,6 +31,7 @@ Text Transcript or Audio Upload
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` | Lazy-loaded 384-dimensional semantic vectors for drift, recall, and pre-meeting briefs. |
 | Vector memory | Qdrant | Persistent semantic memory target for decisions, action items, and meeting chunks. Local mode uses the same payload contract in JSON for offline verification. |
 | Relational persistence | PostgreSQL, SQLite fallback | Meeting metadata, redaction maps, team/user tables, and transcript job history. Docker uses Postgres; local tests can use SQLite files. |
+| Auth/RBAC | Auth0 JWT, team claims | FastAPI verifies RS256 bearer tokens when Auth0 is configured, enforces team membership, and syncs verified users/teams into Postgres. |
 | Observability | Lyzr Studio / OTLP | Lyzr Studio reads the Qdrant-backed decision memory through a Knowledge Base/Data Connector; local runs emit inspectable JSONL traces, and OTLP export is available when Lyzr provides a collector endpoint. |
 | Backend | FastAPI, Python | API and business services. |
 | Frontend | Static HTML/CSS/JS or Vite | Demo command center UI. |
@@ -64,7 +65,9 @@ API failures use stable JSON error details: malformed payloads return `malformed
 
 The Recall panel includes a `Clear Qdrant` button wired to `POST /v1/admin/qdrant/clear`. It deletes and recreates the configured `decisions`, `action_items`, and `meeting_chunks` collections using the active Qdrant URL/API key from the backend environment. PostgreSQL metadata and job history are intentionally not deleted by this control.
 
-Agent clients can use the same backend through protocol adapters. MCP clients can call `POST /mcp` or `POST /v1/mcp` with `tools/list` and `tools/call`. A2A clients can discover the agent at `GET /.well-known/agent-card.json` and send JSON-RPC messages to `POST /v1/a2a`.
+Auth0 is enabled automatically when `AUTH0_DOMAIN` and `AUTH0_AUDIENCE` are set, unless `AUTH_REQUIRED=0` is explicitly configured for local development. Bearer tokens must include team claims under `https://meetingmate/teams` and role claims under `https://meetingmate/roles` by default; override the namespace with `AUTH0_CLAIMS_NAMESPACE`. The frontend reads `/v1/auth/config`, starts Auth0 Universal Login, and attaches access tokens to API calls.
+
+Agent clients can use the same backend through protocol adapters. MCP clients can call `POST /mcp` or `POST /v1/mcp` with `tools/list` and `tools/call`. A2A clients can discover the agent at `GET /.well-known/agent-card.json` and send JSON-RPC messages to `POST /v1/a2a`. When auth is enabled, MCP/A2A JSON-RPC endpoints also require bearer tokens.
 
 Audio uploads use `POST /v1/transcripts/upload` with an `mp3`, `wav`, `m4a`, or `ogg` file. The backend saves the file under `backend/audio_uploads/{job_id}/`, transcribes it with Deepgram Nova-2 diarization and punctuation, converts the response into speaker-tagged transcript lines, runs the normal async MeetingPipeline job, and removes the uploaded file directory when processing finishes.
 
@@ -161,7 +164,7 @@ python scripts/fresh_clone_audit.py
 
 ## Known Limitations
 
-The repository currently ships an offline-verifiable MVP plus live Qdrant, PostgreSQL metadata persistence, durable SQLite/Postgres job history, ADK, Groq, Deepgram audio ingestion, Lyzr Studio Knowledge Base verification, and optional OTLP tracing adapters. Local tests can still run without cloud credentials by using deterministic fallbacks; the Docker demo uses Qdrant as the active memory backend, Postgres as the metadata backend, MiniLM semantic embeddings, ADK for extraction orchestration, and Groq when `GROQ_API_KEY` is set. Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing remain scoped as stretch work after the core transcript and audio paths.
+The repository currently ships an offline-verifiable MVP plus live Qdrant, PostgreSQL metadata persistence, encrypted redaction maps, durable SQLite/Postgres job history, Auth0 JWT/RBAC, ADK, Groq, Deepgram audio ingestion, Lyzr Studio Knowledge Base verification, and optional OTLP tracing adapters. Local tests can still run without cloud credentials by using deterministic fallbacks; the Docker demo uses Qdrant as the active memory backend, Postgres as the metadata backend, MiniLM semantic embeddings, ADK for extraction orchestration, and Groq when `GROQ_API_KEY` is set. TLS 1.3 should be terminated by a production reverse proxy or cloud load balancer; the app includes `REQUIRE_HTTPS=1` redirect support, while local Docker remains HTTP for development. Slack/email escalation and full Celery/Redis queueing remain scoped as stretch work after the core transcript and audio paths.
 
 ## Project Structure
 

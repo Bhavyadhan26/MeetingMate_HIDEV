@@ -1,7 +1,19 @@
 const API = window.MEETINGMATE_API_BASE || "http://localhost:8000";
+let tokenProvider = null;
+
+export function setAccessTokenProvider(provider) {
+  tokenProvider = provider;
+}
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API}${path}`, options);
+  const headers = new Headers(options.headers || {});
+  if (tokenProvider) {
+    const token = await tokenProvider();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+  const response = await fetch(`${API}${path}`, { ...options, headers });
   const payload = await response.json();
   if (!response.ok) {
     throw payload;

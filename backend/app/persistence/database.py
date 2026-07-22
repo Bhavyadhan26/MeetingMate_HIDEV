@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from backend.app.security import decrypt_json, encrypt_json
+
 
 def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -137,8 +139,45 @@ class MetadataStore:
                 team_id=excluded.team_id,
                 redaction_map_json=excluded.redaction_map_json
             """,
-            (meeting_id, team_id, json.dumps(redaction_map, default=str), utcnow_iso()),
+            (meeting_id, team_id, encrypt_json(redaction_map), utcnow_iso()),
         )
+
+    def get_redaction_map(self, meeting_id: str) -> Dict[str, Any]:
+        row = self._fetch_one("SELECT redaction_map_json FROM redaction_maps WHERE meeting_id = ?", (meeting_id,))
+        if not row:
+            return {}
+        value = row["redaction_map_json"] if not isinstance(row, dict) else row["redaction_map_json"]
+        return decrypt_json(value)
+
+    def sync_user_context(self, subject: str, email: str, roles: set[str], teams: set[str]) -> None:
+        primary_role = sorted(roles)[0] if roles else "member"
+        self._execute(
+            """
+            INSERT INTO users (id, email, password_hash, role, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET email=excluded.email, role=excluded.role
+            """,
+            (subject, email or f"{subject}@auth0.local", "auth0", primary_role, utcnow_iso()),
+        )
+        for team_id in teams:
+            if team_id == "*":
+                continue
+            self._execute(
+                """
+                INSERT INTO teams (id, name, created_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET name=excluded.name
+                """,
+                (team_id, team_id, utcnow_iso()),
+            )
+            self._execute(
+                """
+                INSERT INTO team_memberships (team_id, user_id, role, created_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(team_id, user_id) DO UPDATE SET role=excluded.role
+                """,
+                (team_id, subject, primary_role, utcnow_iso()),
+            )
 
     def create_job(self, job: Dict[str, Any], payload: Dict[str, Any], kind: str, audio_path: str | None = None, content_type: str | None = None) -> None:
         self._execute(

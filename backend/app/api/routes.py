@@ -263,12 +263,14 @@ def _job_worker_loop() -> None:
 
 
 def _public_job(job: Dict[str, Any]) -> Dict[str, Any]:
+    payload = job.get("payload") or {}
     return {
         "job_id": job["job_id"],
         "status": job["status"],
         "created_at": job["created_at"],
         "updated_at": job["updated_at"],
         "expires_at": job.get("expires_at"),
+        "team_id": payload.get("team_id"),
         "result": job.get("result"),
         "error": job.get("error"),
     }
@@ -326,6 +328,14 @@ def pre_meeting_brief(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def resolve_decision(decision_id: str, resolver: str, note: str) -> Dict[str, Any]:
     return resolve_decision_with_role(decision_id, resolver, note, "team_lead")
+
+
+def get_decision(decision_id: str) -> Optional[Dict[str, Any]]:
+    _ensure_initialized()
+    try:
+        return _memory.get_decision(decision_id)
+    except Exception as exc:
+        raise classify_processing_error(exc, "decision_get") from exc
 
 
 def resolve_decision_with_role(decision_id: str, resolver: str, note: str, resolver_role: str) -> Dict[str, Any]:

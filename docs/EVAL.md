@@ -1,22 +1,15 @@
 # Evaluation
 
-The drift evaluation set is implemented in `scripts/run_eval.py`. It contains 10 hand-written pairs across `New`, `Related`, and `Potential Conflict` labels.
+The drift evaluation set is implemented in `scripts/run_eval.py`. It contains 100 synthetic scenarios across `New`, `Related`, and `Potential Conflict` labels and reports accuracy plus precision/recall/F1 per label.
 
 Latest local run:
 
 ```text
 Decision Drift Eval
-cases=10 correct=10 accuracy=100.00%
-01 expected=Potential Conflict actual=Potential Conflict ok=True
-02 expected=Related actual=Related ok=True
-03 expected=New actual=New ok=True
-04 expected=Potential Conflict actual=Potential Conflict ok=True
-05 expected=Related actual=Related ok=True
-06 expected=New actual=New ok=True
-07 expected=Potential Conflict actual=Potential Conflict ok=True
-08 expected=Related actual=Related ok=True
-09 expected=Potential Conflict actual=Potential Conflict ok=True
-10 expected=New actual=New ok=True
+cases=100 correct=100 accuracy=100.00%
+Potential Conflict: precision=100.00% recall=100.00% f1=100.00% support=40
+Related: precision=100.00% recall=100.00% f1=100.00% support=30
+New: precision=100.00% recall=100.00% f1=100.00% support=30
 ```
 
 Decision grounding is checked in `backend/tests/test_pipeline.py`: every extracted decision used in the test includes a verbatim `source_excerpt`.
@@ -50,6 +43,7 @@ POST /v1/briefs/pre-meeting -> agenda topic 'Qdrant ledger' returned 1 cited pri
 UI verification -> process, conflict display, resolve, and search all rendered correctly
 UI brief verification -> clicking Brief rendered 'Qdrant ledger' with 1 cited active decision
 hardening tests -> malformed transcript returns structured 400, dependency outage maps to structured 503, provider rate limit maps to structured 429, Qdrant retry succeeds after transient failures
+security tests -> `backend/tests/test_security.py` verifies Auth0-required routes reject missing bearer tokens with 401, auth config remains public for Universal Login bootstrap, team access rejects non-members, admin roles can access any team/admin action, and redaction maps are stored as `aesgcm256:` ciphertext without plaintext names
 decision lifecycle check -> `backend/tests/test_pipeline.py` verifies unacknowledged reversals become `conflicted`, while an explicit replacement decision remains `active` and updates the prior active decision to `superseded`; live team `supersede-live` produced new `active` decision related to prior `decision-bc326333e0`, and Qdrant listed that prior as `superseded`
 PostgreSQL persistence check -> Docker compose started `postgres:16-alpine`; live async job `job-9df53b647892` completed and Postgres contained the matching `transcript_jobs` row with result JSON, meeting `meeting-d3508606aa` in `meetings`, and its redaction map in `redaction_maps`; after `docker compose restart backend`, `GET /v1/transcripts/jobs/job-9df53b647892` still returned `completed`
 Qdrant clear button check -> served frontend includes `#clear-qdrant` and `clearQdrantCollections()` calling `/v1/admin/qdrant/clear`; live `POST /v1/admin/qdrant/clear` returned `{"status":"cleared","collections":["decisions","action_items","meeting_chunks"]}`, and a backend Qdrant list for team `persist-live` returned `0` decisions afterward
