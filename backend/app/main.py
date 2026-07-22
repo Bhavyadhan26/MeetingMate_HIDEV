@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, File, Form, HTTPException, UploadFile
     from fastapi.middleware.cors import CORSMiddleware
 except Exception:  # pragma: no cover
     FastAPI = None
 
 from backend.app.api.protocols import a2a_agent_card, handle_a2a_jsonrpc, handle_mcp_jsonrpc
-from backend.app.api.routes import enqueue_transcript, get_transcript_job, list_unresolved_conflicts, pre_meeting_brief, process_transcript, resolve_decision_with_role, search_memory
+from backend.app.api.routes import enqueue_audio_transcript, enqueue_transcript, get_transcript_job, list_unresolved_conflicts, pre_meeting_brief, process_transcript, resolve_decision_with_role, search_memory
 from backend.app.services.errors import AppError
 
 
@@ -22,6 +22,27 @@ if FastAPI:
     @app.post("/v1/transcripts/async")
     def ingest_transcript_async(payload: dict) -> dict:
         return _handle_app_error(lambda: enqueue_transcript(payload))
+
+    @app.post("/v1/transcripts/upload")
+    async def upload_audio_transcript(
+        file: UploadFile = File(...),
+        title: str = Form("Untitled audio meeting"),
+        team_id: str = Form("demo-team"),
+        attendees: str = Form(""),
+        agenda: str = Form(""),
+    ) -> dict:
+        content = await file.read()
+        return _handle_app_error(
+            lambda: enqueue_audio_transcript(
+                filename=file.filename or "upload",
+                content=content,
+                content_type=file.content_type,
+                title=title,
+                team_id=team_id,
+                attendees=_parse_form_list(attendees),
+                agenda=_parse_form_list(agenda),
+            )
+        )
 
     @app.get("/v1/transcripts/jobs/{job_id}")
     def transcript_job(job_id: str) -> dict:
@@ -81,5 +102,9 @@ if FastAPI:
             raise
         except AppError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from exc
+
+
+    def _parse_form_list(value: str) -> list[str]:
+        return [item.strip() for item in str(value or "").replace("\n", ",").split(",") if item.strip()]
 else:
     app = None

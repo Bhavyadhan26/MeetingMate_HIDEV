@@ -3,6 +3,7 @@ from __future__ import annotations
 from backend.app.memory import LocalVectorMemory
 from backend.app.models import AgendaTopicBrief, DecisionCitation, PreMeetingBrief
 from backend.app.observability import trace_event
+from backend.app.agents.groq_llm import chat_json, groq_enabled
 
 
 class RecallAgent:
@@ -18,7 +19,18 @@ class RecallAgent:
             answer = {"answer": "No related decisions were found.", "citations": []}
         else:
             citations = [{"decision_id": hit["id"], "text": hit["text"], "source_excerpt": hit["source_excerpt"], "status": hit["status"], "score": hit["score"]} for hit in hits]
-            answer = {"answer": f"Most relevant decision: {hits[0]['text']}", "citations": citations}
+            response = f"Most relevant decision: {hits[0]['text']}"
+            if groq_enabled():
+                try:
+                    payload = chat_json(
+                        "Answer the user's question from cited decision memory only. Return JSON with answer:string. Do not add uncited facts.",
+                        f"Question: {query}\nCitations JSON:\n{citations}",
+                        max_tokens=900,
+                    )
+                    response = str(payload.get("answer") or response)
+                except Exception as exc:
+                    trace_event(self.name, "groq_error", {"trace_id": trace_id, "error": str(exc)})
+            answer = {"answer": response, "citations": citations}
         trace_event(self.name, "finish", {"trace_id": trace_id, "citations": len(answer["citations"])})
         return answer
 
@@ -40,10 +52,17 @@ class RecallAgent:
                 )
                 for hit in hits
             ]
-            if citations:
-                summary = f"{len(citations)} prior decision(s) may affect {normalized}."
-            else:
-                summary = f"No prior decisions found for {normalized}."
+            summary = f"{len(citations)} prior decision(s) may affect {normalized}." if citations else f"No prior decisions found for {normalized}."
+            if citations and groq_enabled():
+                try:
+                    payload = chat_json(
+                        "Prepare a concise pre-meeting brief topic summary from cited decisions. Return JSON with summary:string.",
+                        f"Agenda topic: {normalized}\nCitations JSON:\n{[citation.model_dump() for citation in citations]}",
+                        max_tokens=700,
+                    )
+                    summary = str(payload.get("summary") or summary)
+                except Exception as exc:
+                    trace_event(self.name, "groq_error", {"trace_id": trace_id, "error": str(exc), "topic": normalized})
             topics.append(AgendaTopicBrief(topic=normalized, summary=summary, citations=citations))
         brief = PreMeetingBrief(team_id=team_id, agenda=[topic.topic for topic in topics], topics=topics, trace_id=trace_id)
         trace_event(self.name, "pre_meeting_brief_finish", {"trace_id": trace_id, "topics": len(brief.topics), "citations": sum(len(topic.citations) for topic in brief.topics)})

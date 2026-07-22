@@ -6,3 +6,6 @@ google-adk==1.0.0
 opentelemetry-api==1.31.0
 opentelemetry-sdk==1.31.0
 opentelemetry-exporter-otlp==1.31.0
+sentence-transformers==3.3.1
+groq==0.13.1
+python-multipart==0.0.20

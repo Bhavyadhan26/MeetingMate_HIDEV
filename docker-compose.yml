@@ -9,12 +9,16 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       APP_ENV: local
       MEMORY_BACKEND: ${MEMORY_BACKEND:-qdrant}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       LYZR_OTLP_ENDPOINT: ${LYZR_OTLP_ENDPOINT:-}
       LYZR_API_KEY: ${LYZR_API_KEY:-}
       LYZR_OTLP_HEADERS: ${LYZR_OTLP_HEADERS:-}

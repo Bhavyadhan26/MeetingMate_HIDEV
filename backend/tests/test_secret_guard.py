@@ -1,5 +1,9 @@
 import unittest
+import sys
+from pathlib import Path
 
+for candidate in (Path(__file__).resolve().parents[1], Path(__file__).resolve().parents[2]):
+    sys.path.insert(0, str(candidate))
 from scripts.check_no_secrets_tracked import is_secret_path
 
 

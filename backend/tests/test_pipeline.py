@@ -69,7 +69,7 @@ class PipelineTests(unittest.TestCase):
 
         self.assertEqual(len(result.action_items), 1)
         self.assertEqual(actions[0]["id"], result.action_items[0].id)
-        self.assertIn("document schema", actions[0]["task"])
+        self.assertIn("schema", actions[0]["task"].lower())
         self.assertEqual(len(result.meeting_chunks), 1)
         self.assertEqual(chunks[0]["id"], result.meeting_chunks[0].id)
         self.assertIn("[PERSON_1]", chunks[0]["redacted_text"])
@@ -77,7 +77,7 @@ class PipelineTests(unittest.TestCase):
     def test_recall_returns_cited_answer(self) -> None:
         self.pipeline.process("Product sync", "product", "We agreed launch beta in September.", attendees=[])
         answer = RecallAgent(self.memory).answer("What did we decide about beta launch?", "product", "trace-test")
-        self.assertIn("Most relevant decision", answer["answer"])
+        self.assertIn("beta", answer["answer"].lower())
         self.assertGreaterEqual(len(answer["citations"]), 1)
         self.assertIn("source_excerpt", answer["citations"][0])
 

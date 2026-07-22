@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
 from uuid import NAMESPACE_URL, uuid5
 
-from .embeddings import cosine, embed_text
+from .embeddings import DIMENSIONS, cosine, embed_text
 
-VECTOR_SIZE = 64
+VECTOR_SIZE = DIMENSIONS
 DECISIONS_COLLECTION = "decisions"
 ACTION_ITEMS_COLLECTION = "action_items"
 MEETING_CHUNKS_COLLECTION = "meeting_chunks"
@@ -155,6 +155,8 @@ class QdrantVectorMemory:
         for collection in (DECISIONS_COLLECTION, ACTION_ITEMS_COLLECTION, MEETING_CHUNKS_COLLECTION):
             for _ in range(12):
                 try:
+                    if self.client.collection_exists(collection):
+                        self._recreate_if_vector_size_mismatch(collection)
                     if not self.client.collection_exists(collection):
                         self.client.create_collection(
                             collection_name=collection,
@@ -170,6 +172,31 @@ class QdrantVectorMemory:
                     time.sleep(1)
             if last_error is not None:
                 raise RuntimeError(f"Could not initialize Qdrant collection {collection}: {last_error}") from last_error
+
+    def _recreate_if_vector_size_mismatch(self, collection: str) -> None:
+        if os.getenv("QDRANT_RECREATE_ON_VECTOR_SIZE_MISMATCH", "1").lower() not in {"1", "true", "yes"}:
+            return
+        configured_size = self._collection_vector_size(collection)
+        if configured_size is not None and configured_size != VECTOR_SIZE:
+            self.client.delete_collection(collection)
+
+    def _collection_vector_size(self, collection: str) -> Optional[int]:
+        try:
+            info = self.client.get_collection(collection)
+            vectors = info.config.params.vectors
+            size = getattr(vectors, "size", None)
+            if size is not None:
+                return int(size)
+            if isinstance(vectors, dict):
+                first = next(iter(vectors.values()))
+                if isinstance(first, dict):
+                    return int(first.get("size"))
+                first_size = getattr(first, "size", None)
+                if first_size is not None:
+                    return int(first_size)
+        except Exception:
+            return None
+        return None
 
     def _ensure_payload_index(self, collection: str, field_name: str, field_schema: Any) -> None:
         try:

@@ -87,7 +87,7 @@ def main() -> int:
 def process_meeting(payload: dict) -> dict:
     job = request("POST", "/v1/transcripts/async", payload)
     job_id = job["job_id"]
-    for _ in range(120):
+    for _ in range(300):
         current = request("GET", f"/v1/transcripts/jobs/{urllib.parse.quote(job_id)}")
         if current["status"] == "completed":
             return current["result"]

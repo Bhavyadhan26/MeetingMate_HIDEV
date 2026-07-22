@@ -30,6 +30,32 @@ class HardeningTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"]["code"], "malformed_transcript")
 
+    def test_audio_upload_rejects_unsupported_file_type(self) -> None:
+        if TestClient is None:
+            self.skipTest("FastAPI test client is not installed.")
+        from backend.app.main import app
+
+        response = TestClient(app).post(
+            "/v1/transcripts/upload",
+            files={"file": ("meeting.txt", b"not audio", "text/plain")},
+            data={"title": "Bad audio", "team_id": "audio-test"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"]["code"], "malformed_transcript")
+
+    def test_audio_upload_queues_deepgram_job(self) -> None:
+        if TestClient is None:
+            self.skipTest("FastAPI test client is not installed.")
+        from backend.app.main import app
+
+        response = TestClient(app).post(
+            "/v1/transcripts/upload",
+            files={"file": ("meeting.wav", b"RIFF....WAVE", "audio/wav")},
+            data={"title": "Audio path", "team_id": "audio-test", "attendees": "Asha Rao", "agenda": "memory"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("job_id", response.json())
+
     def test_dependency_error_returns_structured_503(self) -> None:
         if TestClient is None:
             self.skipTest("FastAPI test client is not installed.")
@@ -44,29 +70,46 @@ class HardeningTests(unittest.TestCase):
         if TestClient is None:
             self.skipTest("FastAPI test client is not installed.")
         from backend.app.main import app
+        from backend.app.api import routes
+        from backend.app.memory.vector_store import LocalVectorMemory
+        from backend.app.services import MeetingPipeline
 
         client = TestClient(app)
-        response = client.post(
-            "/v1/transcripts/async",
-            json={
-                "title": "Async path",
-                "team_id": "async-test",
-                "transcript": "We decided use Qdrant for async job memory.",
-                "attendees": [],
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        job_id = response.json()["job_id"]
-
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp.close()
+        os.unlink(tmp.name)
         final = None
-        for _ in range(120):
-            polled = client.get(f"/v1/transcripts/jobs/{job_id}")
-            self.assertEqual(polled.status_code, 200)
-            payload = polled.json()
-            if payload["status"] == "completed":
-                final = payload
-                break
-            time.sleep(0.25)
+        try:
+            test_memory = LocalVectorMemory(tmp.name)
+            with (
+                patch.dict(os.environ, {"GROQ_API_KEY": ""}, clear=False),
+                patch.object(routes, "_memory", test_memory),
+                patch.object(routes, "_pipeline", MeetingPipeline(test_memory)),
+                patch("backend.app.memory.vector_store.embed_text", return_value=[0.1] * 384),
+            ):
+                response = client.post(
+                    "/v1/transcripts/async",
+                    json={
+                        "title": "Async path",
+                        "team_id": "async-test",
+                        "transcript": "We decided use Qdrant for async job memory.",
+                        "attendees": [],
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                job_id = response.json()["job_id"]
+
+                for _ in range(120):
+                    polled = client.get(f"/v1/transcripts/jobs/{job_id}")
+                    self.assertEqual(polled.status_code, 200)
+                    payload = polled.json()
+                    if payload["status"] == "completed":
+                        final = payload
+                        break
+                    time.sleep(0.25)
+        finally:
+            if os.path.exists(tmp.name):
+                os.unlink(tmp.name)
 
         self.assertIsNotNone(final)
         self.assertEqual(final["result"]["decisions"][0]["text"], "use Qdrant for async job memory")
@@ -157,9 +200,10 @@ class HardeningTests(unittest.TestCase):
                 source_excerpt="Decision: no longer use Qdrant.",
                 status="conflicted",
             )
-            memory.upsert_decision(decision)
+            with patch("backend.app.memory.vector_store.embed_text", return_value=[0.1] * 384):
+                memory.upsert_decision(decision)
             memory.update_decision(decision.id, created_at=(datetime.now(timezone.utc) - timedelta(hours=25)).isoformat())
-            with patch.object(routes, "memory", memory), patch.dict(os.environ, {"CONFLICT_ESCALATION_HOURS": "24"}, clear=False):
+            with patch.object(routes, "_memory", memory), patch.dict(os.environ, {"CONFLICT_ESCALATION_HOURS": "24"}, clear=False):
                 result = routes.list_unresolved_conflicts("audit-team")
             self.assertEqual(len(result["conflicts"]), 1)
             self.assertTrue(result["conflicts"][0]["escalation"]["expired"])

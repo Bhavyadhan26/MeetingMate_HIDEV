@@ -17,6 +17,19 @@ export function submitTranscript(payload) {
   });
 }
 
+export function uploadAudio({ file, title, teamId, attendees, agenda }) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("title", title || "Untitled audio meeting");
+  form.append("team_id", teamId || "demo-team");
+  form.append("attendees", attendees || "");
+  form.append("agenda", agenda || "");
+  return request("/v1/transcripts/upload", {
+    method: "POST",
+    body: form
+  });
+}
+
 export function getTranscriptJob(jobId) {
   return request(`/v1/transcripts/jobs/${encodeURIComponent(jobId)}`);
 }

@@ -5,13 +5,15 @@ This project addresses Decision Decay: the tendency for meeting commitments to b
 ## Architecture
 
 ```
-Transcript Upload
+Text Transcript or Audio Upload
+  -> Deepgram STT for audio (Nova-2, diarization)
   -> PII Redaction
   -> Google ADK Manager
-      -> Summarizer Agent
-      -> Action Item Extractor
-      -> Conservative Decision Extractor
+      -> Groq Summarizer Agent
+      -> Groq Action Item Extractor
+      -> Groq Conservative Decision Extractor
   -> Decision Drift Agent
+      -> all-MiniLM-L6-v2 embeddings
       -> Qdrant-compatible vector memory
       -> status: active / conflicted / resolved
   -> Recall Agent + UI
@@ -23,6 +25,9 @@ Transcript Upload
 | Layer | Technology | Role |
 |---|---|---|
 | Agent orchestration | Google ADK | Docker/runtime path uses an ADK `SequentialAgent` wrapping a `ParallelAgent` for extraction. Local tests use a deterministic fallback when ADK is absent. |
+| LLM inference | Groq `llama-3.1-8b-instant` | Summarizer, action item extractor, decision extractor, drift classifier, and recall agent use Groq JSON output when `GROQ_API_KEY` is configured. |
+| Speech-to-text | Deepgram Nova-2 | Audio upload path uses diarization, punctuation, utterances, and speaker-tagged transcript formatting. |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` | Lazy-loaded 384-dimensional semantic vectors for drift, recall, and pre-meeting briefs. |
 | Vector memory | Qdrant | Persistent semantic memory target for decisions, action items, and meeting chunks. Local mode uses the same payload contract in JSON for offline verification. |
 | Observability | Lyzr Studio / OTLP | Lyzr Studio reads the Qdrant-backed decision memory through a Knowledge Base/Data Connector; local runs emit inspectable JSONL traces, and OTLP export is available when Lyzr provides a collector endpoint. |
 | Backend | FastAPI, Python | API and business services. |
@@ -34,7 +39,7 @@ Transcript Upload
 Prerequisites:
 - Docker Desktop for Qdrant and the composed demo stack.
 - Python 3.12 for local tests/scripts.
-- Optional production credentials in `.env`: Gemini, Qdrant API key, and Lyzr OTLP values.
+- Optional production credentials in `.env`: Groq, Deepgram, Qdrant API key, and Lyzr OTLP values.
 
 Copy `.env.example` to `.env` and fill only local or real secret values on your machine. Do not commit `.env`.
 
@@ -55,6 +60,8 @@ The compose stack runs the backend with `MEMORY_BACKEND=qdrant` and `google-adk`
 API failures use stable JSON error details: malformed payloads return `malformed_transcript`, dependency outages return `dependency_unavailable`, and provider rate limits return `provider_rate_limited`. Qdrant read/write operations retry briefly before surfacing a dependency failure. The UI uses `POST /v1/transcripts/async` plus `GET /v1/transcripts/jobs/{job_id}` polling so users see queued/processing/completed state instead of waiting on a blank request. Completed and failed transcript jobs expire after `TRANSCRIPT_JOB_TTL_SECONDS`.
 
 Agent clients can use the same backend through protocol adapters. MCP clients can call `POST /mcp` or `POST /v1/mcp` with `tools/list` and `tools/call`. A2A clients can discover the agent at `GET /.well-known/agent-card.json` and send JSON-RPC messages to `POST /v1/a2a`.
+
+Audio uploads use `POST /v1/transcripts/upload` with an `mp3`, `wav`, `m4a`, or `ogg` file. The backend saves the file under `backend/audio_uploads/{job_id}/`, transcribes it with Deepgram Nova-2 diarization and punctuation, converts the response into speaker-tagged transcript lines, runs the normal async MeetingPipeline job, and removes the uploaded file directory when processing finishes.
 
 Run integration smoke checks:
 
@@ -149,7 +156,7 @@ python scripts/fresh_clone_audit.py
 
 ## Known Limitations
 
-The repository currently ships an offline-verifiable MVP plus live Qdrant, ADK, Lyzr Studio Knowledge Base verification, and optional OTLP tracing adapters. Local tests run without cloud credentials by using deterministic adapters; the Docker demo uses Qdrant as the active memory backend and ADK for extraction orchestration. Real audio ingestion, Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing are scoped as stretch work after the core transcript path is verified.
+The repository currently ships an offline-verifiable MVP plus live Qdrant, ADK, Groq, Deepgram audio ingestion, Lyzr Studio Knowledge Base verification, and optional OTLP tracing adapters. Local tests can still run without cloud credentials by using deterministic fallbacks; the Docker demo uses Qdrant as the active memory backend, MiniLM semantic embeddings, ADK for extraction orchestration, and Groq when `GROQ_API_KEY` is set. Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing remain scoped as stretch work after the core transcript and audio paths.
 
 ## Project Structure
 

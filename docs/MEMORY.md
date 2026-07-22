@@ -23,7 +23,7 @@ Payload:
 - `resolved_by`
 - `resolution_note`
 
-Vector: deterministic 64-dimensional token-hash embedding in local mode and in the first Qdrant adapter. Production should replace this with the selected embedding model while preserving the payload schema.
+Vector: lazy `sentence-transformers/all-MiniLM-L6-v2` embedding, 384 dimensions, cosine distance. `QdrantVectorMemory` recreates older local/Qdrant collections when their configured vector size does not match `VECTOR_SIZE=384` and `QDRANT_RECREATE_ON_VECTOR_SIZE_MISMATCH` is enabled.
 
 ### `action_items`
 

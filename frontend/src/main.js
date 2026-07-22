@@ -4,7 +4,8 @@ import {
   listConflicts,
   resolveDecisionConflict,
   searchMemory,
-  submitTranscript
+  submitTranscript,
+  uploadAudio
 } from "./api/client.js";
 
 const statusEl = document.querySelector("#status");
@@ -120,6 +121,27 @@ document.querySelector("#upload-form").addEventListener("submit", async (event) 
       transcript: document.querySelector("#transcript").value,
       attendees: parseList(document.querySelector("#attendees").value),
       agenda: parseList(document.querySelector("#upload-agenda").value)
+    });
+    pollJob(job.job_id);
+  } catch (error) {
+    showError(error);
+  }
+});
+
+document.querySelector("#audio-upload").addEventListener("click", async () => {
+  const file = document.querySelector("#audio-file").files[0];
+  if (!file) {
+    statusEl.textContent = "Choose audio";
+    return;
+  }
+  statusEl.textContent = "Audio queued";
+  try {
+    const job = await uploadAudio({
+      file,
+      title: document.querySelector("#title").value,
+      teamId: document.querySelector("#team").value,
+      attendees: document.querySelector("#attendees").value,
+      agenda: document.querySelector("#upload-agenda").value
     });
     pollJob(job.job_id);
   } catch (error) {
