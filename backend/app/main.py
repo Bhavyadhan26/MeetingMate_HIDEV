@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 try:
     from fastapi import FastAPI, File, Form, HTTPException, UploadFile
     from fastapi.middleware.cors import CORSMiddleware
@@ -7,12 +9,17 @@ except Exception:  # pragma: no cover
     FastAPI = None
 
 from backend.app.api.protocols import a2a_agent_card, handle_a2a_jsonrpc, handle_mcp_jsonrpc
-from backend.app.api.routes import clear_qdrant_collections, enqueue_audio_transcript, enqueue_transcript, get_transcript_job, list_unresolved_conflicts, pre_meeting_brief, process_transcript, resolve_decision_with_role, search_memory
+from backend.app.api.routes import clear_qdrant_collections, enqueue_audio_transcript, enqueue_transcript, get_transcript_job, list_unresolved_conflicts, pre_meeting_brief, process_transcript, resolve_decision_with_role, search_memory, stop_worker
 from backend.app.services.errors import AppError
 
 
 if FastAPI:
-    app = FastAPI(title="AI Chief of Staff Meeting Command Center")
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        yield
+        stop_worker()
+
+    app = FastAPI(title="AI Chief of Staff Meeting Command Center", lifespan=lifespan)
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
     @app.post("/v1/transcripts")

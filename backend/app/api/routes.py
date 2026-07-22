@@ -5,7 +5,7 @@ import shutil
 import time as _time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -23,6 +23,8 @@ _pipeline: Optional[MeetingPipeline] = None
 _recall: Optional[RecallAgent] = None
 _metadata: Optional[MetadataStore] = None
 _worker_started = False
+_worker_stop = Event()
+_worker_thread: Optional[Thread] = None
 _worker_lock = Lock()
 _TERMINAL_JOB_STATUSES = {"completed", "failed"}
 _AUDIO_UPLOAD_ROOT = Path(os.getenv("AUDIO_UPLOAD_ROOT", "backend/audio_uploads"))
@@ -224,20 +226,32 @@ def _update_job(job_id: str, **fields: Any) -> None:
 
 
 def _start_worker() -> None:
-    global _worker_started
+    global _worker_started, _worker_thread
     with _worker_lock:
         if _worker_started:
             return
-        Thread(target=_job_worker_loop, name="meetingmate-job-worker", daemon=True).start()
+        _worker_stop.clear()
+        _worker_thread = Thread(target=_job_worker_loop, name="meetingmate-job-worker")
+        _worker_thread.start()
         _worker_started = True
 
 
+def stop_worker(timeout_seconds: float = 5.0) -> None:
+    global _worker_started, _worker_thread
+    _worker_stop.set()
+    if _worker_thread is not None:
+        _worker_thread.join(timeout=timeout_seconds)
+    with _worker_lock:
+        _worker_started = False
+        _worker_thread = None
+
+
 def _job_worker_loop() -> None:
-    while True:
+    while not _worker_stop.is_set():
         try:
             job = _metadata.next_queued_job() if _metadata else None
             if not job:
-                _time.sleep(0.5)
+                _worker_stop.wait(0.5)
                 continue
             if job["kind"] == "audio":
                 _run_audio_transcript_job(job["job_id"], Path(job["audio_path"]), job.get("content_type"), job["payload"])
@@ -245,7 +259,7 @@ def _job_worker_loop() -> None:
                 _run_transcript_job(job["job_id"], job["payload"])
         except Exception as exc:
             trace_event("job_queue", "worker_error", {"error": str(exc)})
-            _time.sleep(1)
+            _worker_stop.wait(1)
 
 
 def _public_job(job: Dict[str, Any]) -> Dict[str, Any]:

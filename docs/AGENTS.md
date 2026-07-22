@@ -54,6 +54,8 @@ Labels:
 
 Potential conflicts are written as `status=conflicted` and include the prior decision id.
 
+Acknowledged replacements complete the `superseded` lifecycle. If the new decision explicitly says it supersedes, replaces, resolves, or overrides the prior decision, the new decision is written as `status=active`, the prior active decision is updated to `status=superseded`, and the new decision keeps the prior id in `related_decision_ids`. Unacknowledged reversals remain `status=conflicted` until human review.
+
 Conflict resolution is human-gated through `/v1/decisions/{id}/resolve`. The MVP role check allows `team_lead`, `decision_owner`, and `admin` by default through `CONFLICT_RESOLVER_ROLES`; other roles receive `authorization_failed`. Unresolved conflicts are auditable through `/v1/decisions/conflicts`, which marks conflicts older than `CONFLICT_ESCALATION_HOURS` and emits a `conflict_resolution.escalated` trace event for follow-up.
 
 ## Recall Agent

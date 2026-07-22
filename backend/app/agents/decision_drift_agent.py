@@ -8,6 +8,18 @@ from backend.app.observability import trace_event
 from backend.app.agents.groq_llm import chat_json, groq_enabled
 
 NEGATIONS = ("not ", "no longer", "stop ", "cancel", "reverse", "instead of", "replace", "revert")
+SUPERSESSION_TERMS = (
+    "supersede",
+    "supersedes",
+    "superseded",
+    "replace the prior",
+    "replace prior",
+    "replaces the prior",
+    "resolve the prior",
+    "resolves the prior",
+    "override the prior",
+    "overrides the prior",
+ )
 
 
 class DecisionDriftAgent:
@@ -76,9 +88,22 @@ class DecisionDriftAgent:
     def write_with_status(self, decision: Decision, trace_id: str) -> Decision:
         drift = self.classify(decision, trace_id)
         decision.drift = drift
-        if drift.label == DriftLabel.POTENTIAL_CONFLICT:
+        supersedes_prior = bool(drift.prior_decision_id and self._acknowledges_supersession(decision.text))
+        if supersedes_prior:
+            self.memory.update_decision(drift.prior_decision_id, status=DecisionStatus.SUPERSEDED.value)
+            decision.status = DecisionStatus.ACTIVE
+            trace_event(
+                self.name,
+                "superseded_prior",
+                {"trace_id": trace_id, "decision_id": decision.id, "prior_decision_id": drift.prior_decision_id},
+            )
+        elif drift.label == DriftLabel.POTENTIAL_CONFLICT:
             decision.status = DecisionStatus.CONFLICTED
         if drift.prior_decision_id:
             decision.related_decision_ids.append(drift.prior_decision_id)
         self.memory.upsert_decision(decision)
         return decision
+
+    def _acknowledges_supersession(self, text: str) -> bool:
+        lowered = text.lower()
+        return any(term in lowered for term in SUPERSESSION_TERMS)

@@ -14,7 +14,7 @@ def utcnow_iso() -> str:
 
 class MetadataStore:
     def __init__(self, database_url: str | None = None, sqlite_path: str | None = None) -> None:
-        self.database_url = database_url or os.getenv("DATABASE_URL", "")
+        self.database_url = database_url if database_url is not None else ("" if sqlite_path is not None else os.getenv("DATABASE_URL", ""))
         self.sqlite_path = sqlite_path or os.getenv("SQLITE_METADATA_PATH", "backend/app/persistence/meetingmate.sqlite3")
         self.backend = "postgres" if self.database_url.startswith(("postgres://", "postgresql://")) else "sqlite"
         self._initialize()

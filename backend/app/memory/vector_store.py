@@ -158,10 +158,14 @@ class QdrantVectorMemory:
                     if self.client.collection_exists(collection):
                         self._recreate_if_vector_size_mismatch(collection)
                     if not self.client.collection_exists(collection):
-                        self.client.create_collection(
-                            collection_name=collection,
-                            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
-                        )
+                        try:
+                            self.client.create_collection(
+                                collection_name=collection,
+                                vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+                            )
+                        except Exception as exc:
+                            if not self._is_already_exists_error(exc):
+                                raise
                     self._ensure_payload_index(collection, "team_id", PayloadSchemaType.KEYWORD)
                     if collection == DECISIONS_COLLECTION:
                         self._ensure_payload_index(collection, "status", PayloadSchemaType.KEYWORD)
@@ -178,7 +182,11 @@ class QdrantVectorMemory:
             return
         configured_size = self._collection_vector_size(collection)
         if configured_size is not None and configured_size != VECTOR_SIZE:
-            self.client.delete_collection(collection)
+            try:
+                self.client.delete_collection(collection)
+            except Exception as exc:
+                if not self._is_not_found_error(exc):
+                    raise
 
     def _collection_vector_size(self, collection: str) -> Optional[int]:
         try:
@@ -206,8 +214,18 @@ class QdrantVectorMemory:
                 field_schema=field_schema,
             )
         except Exception as exc:
-            if "already exists" not in str(exc).lower():
+            if not self._is_already_exists_error(exc):
                 raise
+
+    @staticmethod
+    def _is_already_exists_error(exc: Exception) -> bool:
+        message = str(exc).lower()
+        return "already exists" in message or "already_exist" in message
+
+    @staticmethod
+    def _is_not_found_error(exc: Exception) -> bool:
+        message = str(exc).lower()
+        return "not found" in message or "doesn't exist" in message or "does not exist" in message
 
     @staticmethod
     def _point_id(item_id: str, namespace: str = DECISIONS_COLLECTION) -> str:

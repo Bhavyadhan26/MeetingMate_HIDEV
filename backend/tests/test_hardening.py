@@ -21,6 +21,14 @@ from backend.app.services.errors import (
 
 
 class HardeningTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        try:
+            from backend.app.api import routes
+
+            routes.stop_worker()
+        except Exception:
+            pass
+
     def test_malformed_transcript_returns_structured_400(self) -> None:
         if TestClient is None:
             self.skipTest("FastAPI test client is not installed.")
@@ -87,6 +95,7 @@ class HardeningTests(unittest.TestCase):
         try:
             test_memory = LocalVectorMemory(memory_tmp.name)
             test_metadata = MetadataStore(sqlite_path=metadata_tmp.name)
+            routes.stop_worker()
             routes._worker_started = False
             with (
                 patch.dict(os.environ, {"GROQ_API_KEY": ""}, clear=False),
@@ -117,6 +126,7 @@ class HardeningTests(unittest.TestCase):
                         break
                     time.sleep(0.25)
         finally:
+            routes.stop_worker()
             for path in (memory_tmp.name, metadata_tmp.name):
                 if os.path.exists(path):
                     os.unlink(path)
@@ -178,6 +188,26 @@ class HardeningTests(unittest.TestCase):
         with patch.dict(os.environ, {"TRANSCRIPT_JOB_TTL_SECONDS": "invalid"}, clear=False):
             self.assertEqual(routes._job_ttl_seconds(), 3600)
 
+    def test_job_worker_can_stop_gracefully(self) -> None:
+        from backend.app.api import routes
+        from backend.app.persistence.database import MetadataStore
+
+        metadata_tmp = tempfile.NamedTemporaryFile(delete=False)
+        metadata_tmp.close()
+        os.unlink(metadata_tmp.name)
+        try:
+            routes.stop_worker()
+            with patch.object(routes, "_metadata", MetadataStore(sqlite_path=metadata_tmp.name)):
+                routes._start_worker()
+                self.assertTrue(routes._worker_started)
+                routes.stop_worker(timeout_seconds=2)
+                self.assertFalse(routes._worker_started)
+                self.assertIsNone(routes._worker_thread)
+        finally:
+            routes.stop_worker()
+            if os.path.exists(metadata_tmp.name):
+                os.unlink(metadata_tmp.name)
+
     def test_rate_limit_exception_is_classified(self) -> None:
         error = classify_processing_error(RuntimeError("429 rate limit from model provider"), "transcript_ingest")
         self.assertIsInstance(error, ProviderRateLimitedError)
@@ -215,6 +245,11 @@ class HardeningTests(unittest.TestCase):
         memory.client = Client()
         with self.assertRaisesRegex(RuntimeError, "permission denied"):
             memory._ensure_payload_index("decisions", "team_id", "keyword")
+
+    def test_qdrant_race_error_helpers_detect_expected_messages(self) -> None:
+        self.assertTrue(QdrantVectorMemory._is_already_exists_error(RuntimeError("Collection already exists")))
+        self.assertTrue(QdrantVectorMemory._is_not_found_error(RuntimeError("Collection does not exist")))
+        self.assertFalse(QdrantVectorMemory._is_already_exists_error(RuntimeError("permission denied")))
 
     def test_resolution_rejects_unprivileged_role(self) -> None:
         from backend.app.api.routes import resolve_decision_with_role

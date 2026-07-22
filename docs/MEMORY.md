@@ -23,7 +23,7 @@ Payload:
 - `resolved_by`
 - `resolution_note`
 
-Vector: lazy `sentence-transformers/all-MiniLM-L6-v2` embedding, 384 dimensions, cosine distance. `QdrantVectorMemory` recreates older local/Qdrant collections when their configured vector size does not match `VECTOR_SIZE=384` and `QDRANT_RECREATE_ON_VECTOR_SIZE_MISMATCH` is enabled.
+Vector: lazy `sentence-transformers/all-MiniLM-L6-v2` embedding, 384 dimensions, cosine distance. `QdrantVectorMemory` recreates older local/Qdrant collections when their configured vector size does not match `VECTOR_SIZE=384` and `QDRANT_RECREATE_ON_VECTOR_SIZE_MISMATCH` is enabled. Collection creation, deletion, and payload-index setup tolerate common concurrent startup races such as "already exists" and "not found" during migration.
 
 ### `action_items`
 
@@ -56,6 +56,12 @@ Vector: embedded from `redacted_text` when present, otherwise `text`. The MVP st
 ## Retention
 
 Meeting chunks should be archived after 12 months. Decisions remain active until superseded, conflicted, or resolved. Redaction maps are temporary sensitive data and must be encrypted at rest in production.
+
+Decision status lifecycle:
+- `active`: the current accepted decision.
+- `conflicted`: an unacknowledged reversal of an active prior decision.
+- `resolved`: a human reviewer resolved a conflict through `/v1/decisions/{id}/resolve`.
+- `superseded`: a newer decision explicitly acknowledged that it replaces, supersedes, resolves, or overrides the prior active decision.
 
 ## Relational Metadata
 

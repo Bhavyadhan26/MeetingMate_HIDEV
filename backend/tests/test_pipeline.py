@@ -56,6 +56,28 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(status, "conflicted")
         self.assertTrue(second.decisions[0].drift.prior_decision_id)
 
+    def test_acknowledged_replacement_supersedes_prior_decision(self) -> None:
+        first = self.pipeline.process(
+            "Architecture sync",
+            "platform",
+            "Decision: use Qdrant as the vector ledger.",
+            attendees=[],
+        )
+        prior_id = first.decisions[0].id
+
+        second = self.pipeline.process(
+            "Architecture replacement",
+            "platform",
+            "Decision: replace the prior Qdrant vector ledger decision and use Postgres as the vector ledger.",
+            attendees=[],
+        )
+
+        new_status = second.decisions[0].status.value if hasattr(second.decisions[0].status, "value") else second.decisions[0].status
+        prior = [item for item in self.memory.list_decisions("platform", status="superseded") if item["id"] == prior_id]
+        self.assertEqual(new_status, "active")
+        self.assertEqual(len(prior), 1)
+        self.assertEqual(prior[0]["status"], "superseded")
+
     def test_pipeline_persists_actions_and_meeting_chunks(self) -> None:
         result = self.pipeline.process(
             "Delivery sync",
