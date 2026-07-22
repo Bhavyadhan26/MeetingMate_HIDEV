@@ -7,7 +7,7 @@ except Exception:  # pragma: no cover
     FastAPI = None
 
 from backend.app.api.protocols import a2a_agent_card, handle_a2a_jsonrpc, handle_mcp_jsonrpc
-from backend.app.api.routes import enqueue_audio_transcript, enqueue_transcript, get_transcript_job, list_unresolved_conflicts, pre_meeting_brief, process_transcript, resolve_decision_with_role, search_memory
+from backend.app.api.routes import clear_qdrant_collections, enqueue_audio_transcript, enqueue_transcript, get_transcript_job, list_unresolved_conflicts, pre_meeting_brief, process_transcript, resolve_decision_with_role, search_memory
 from backend.app.services.errors import AppError
 
 
@@ -50,6 +50,10 @@ if FastAPI:
         if "error" in result and result["error"] == "Job not found":
             raise HTTPException(status_code=404, detail=result["error"])
         return result
+
+    @app.post("/v1/admin/qdrant/clear")
+    def clear_qdrant() -> dict:
+        return _handle_app_error(clear_qdrant_collections)
 
     @app.get("/v1/memory/search")
     def memory_search(query: str, team_id: str = "demo-team") -> dict:

@@ -72,19 +72,28 @@ class HardeningTests(unittest.TestCase):
         from backend.app.main import app
         from backend.app.api import routes
         from backend.app.memory.vector_store import LocalVectorMemory
+        from backend.app.persistence.database import MetadataStore
+        from backend.app.agents.recall_agent import RecallAgent
         from backend.app.services import MeetingPipeline
 
         client = TestClient(app)
-        tmp = tempfile.NamedTemporaryFile(delete=False)
-        tmp.close()
-        os.unlink(tmp.name)
+        memory_tmp = tempfile.NamedTemporaryFile(delete=False)
+        memory_tmp.close()
+        os.unlink(memory_tmp.name)
+        metadata_tmp = tempfile.NamedTemporaryFile(delete=False)
+        metadata_tmp.close()
+        os.unlink(metadata_tmp.name)
         final = None
         try:
-            test_memory = LocalVectorMemory(tmp.name)
+            test_memory = LocalVectorMemory(memory_tmp.name)
+            test_metadata = MetadataStore(sqlite_path=metadata_tmp.name)
+            routes._worker_started = False
             with (
                 patch.dict(os.environ, {"GROQ_API_KEY": ""}, clear=False),
                 patch.object(routes, "_memory", test_memory),
                 patch.object(routes, "_pipeline", MeetingPipeline(test_memory)),
+                patch.object(routes, "_recall", RecallAgent(test_memory)),
+                patch.object(routes, "_metadata", test_metadata),
                 patch("backend.app.memory.vector_store.embed_text", return_value=[0.1] * 384),
             ):
                 response = client.post(
@@ -108,8 +117,9 @@ class HardeningTests(unittest.TestCase):
                         break
                     time.sleep(0.25)
         finally:
-            if os.path.exists(tmp.name):
-                os.unlink(tmp.name)
+            for path in (memory_tmp.name, metadata_tmp.name):
+                if os.path.exists(path):
+                    os.unlink(path)
 
         self.assertIsNotNone(final)
         self.assertEqual(final["result"]["decisions"][0]["text"], "use Qdrant for async job memory")
@@ -118,21 +128,49 @@ class HardeningTests(unittest.TestCase):
 
     def test_terminal_async_jobs_expire_after_ttl(self) -> None:
         from backend.app.api import routes
+        from backend.app.agents.recall_agent import RecallAgent
+        from backend.app.memory.vector_store import LocalVectorMemory
+        from backend.app.persistence.database import MetadataStore
+        from backend.app.services import MeetingPipeline
 
         expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
         stale = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        memory_tmp = tempfile.NamedTemporaryFile(delete=False)
+        metadata_tmp = tempfile.NamedTemporaryFile(delete=False)
+        memory_tmp.close()
+        metadata_tmp.close()
+        os.unlink(memory_tmp.name)
+        os.unlink(metadata_tmp.name)
         try:
-            routes._jobs["job-expired"] = {"job_id": "job-expired", "status": "completed", "expires_at": expired}
-            routes._jobs["job-active"] = {"job_id": "job-active", "status": "processing", "expires_at": expired}
-            routes._jobs["job-stale"] = {"job_id": "job-stale", "status": "failed", "expires_at": stale}
+            memory = LocalVectorMemory(memory_tmp.name)
+            metadata = MetadataStore(sqlite_path=metadata_tmp.name)
+            now = datetime.now(timezone.utc).isoformat()
+            for job_id, status, expires_at in (
+                ("job-expired", "completed", expired),
+                ("job-active", "processing", expired),
+                ("job-stale", "failed", stale),
+            ):
+                metadata.create_job(
+                    {"job_id": job_id, "status": status, "created_at": now, "updated_at": now, "expires_at": expires_at},
+                    {"transcript": "Decision: keep Qdrant."},
+                    "transcript",
+                )
+                metadata.update_job(job_id, status=status, expires_at=expires_at)
 
-            with patch.dict(os.environ, {"TRANSCRIPT_JOB_TTL_SECONDS": "1"}, clear=False):
+            with (
+                patch.object(routes, "_memory", memory),
+                patch.object(routes, "_pipeline", MeetingPipeline(memory)),
+                patch.object(routes, "_recall", RecallAgent(memory)),
+                patch.object(routes, "_metadata", metadata),
+                patch.dict(os.environ, {"TRANSCRIPT_JOB_TTL_SECONDS": "1"}, clear=False),
+            ):
                 self.assertEqual(routes.get_transcript_job("job-expired")["error"], "Job not found")
-            self.assertIn("job-active", routes._jobs)
-            self.assertEqual(routes.get_transcript_job("job-stale")["error"], "Job not found")
+                self.assertEqual(routes.get_transcript_job("job-active")["status"], "processing")
+                self.assertEqual(routes.get_transcript_job("job-stale")["error"], "Job not found")
         finally:
-            for job_id in ("job-expired", "job-active", "job-stale"):
-                routes._jobs.pop(job_id, None)
+            for path in (memory_tmp.name, metadata_tmp.name):
+                if os.path.exists(path):
+                    os.unlink(path)
 
     def test_invalid_async_job_ttl_falls_back_to_default(self) -> None:
         from backend.app.api import routes

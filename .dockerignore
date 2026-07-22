@@ -19,7 +19,10 @@ dist/
 build/
 
 qdrant_storage/
+postgres_storage/
 .cache/
+backend/app/persistence/*.sqlite3
+backend/app/persistence/*.sqlite3-*
 backend/audio_uploads/
 backend/tests/*.wav
 backend/tests/*.mp3

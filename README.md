@@ -8,6 +8,7 @@ This project addresses Decision Decay: the tendency for meeting commitments to b
 Text Transcript or Audio Upload
   -> Deepgram STT for audio (Nova-2, diarization)
   -> PII Redaction
+  -> PostgreSQL metadata + durable job history
   -> Google ADK Manager
       -> Groq Summarizer Agent
       -> Groq Action Item Extractor
@@ -29,6 +30,7 @@ Text Transcript or Audio Upload
 | Speech-to-text | Deepgram Nova-2 | Audio upload path uses diarization, punctuation, utterances, and speaker-tagged transcript formatting. |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` | Lazy-loaded 384-dimensional semantic vectors for drift, recall, and pre-meeting briefs. |
 | Vector memory | Qdrant | Persistent semantic memory target for decisions, action items, and meeting chunks. Local mode uses the same payload contract in JSON for offline verification. |
+| Relational persistence | PostgreSQL, SQLite fallback | Meeting metadata, redaction maps, team/user tables, and transcript job history. Docker uses Postgres; local tests can use SQLite files. |
 | Observability | Lyzr Studio / OTLP | Lyzr Studio reads the Qdrant-backed decision memory through a Knowledge Base/Data Connector; local runs emit inspectable JSONL traces, and OTLP export is available when Lyzr provides a collector endpoint. |
 | Backend | FastAPI, Python | API and business services. |
 | Frontend | Static HTML/CSS/JS or Vite | Demo command center UI. |
@@ -51,13 +53,16 @@ Run the stack:
 docker compose up --build
 ```
 
-Backend: `http://localhost:8000`  
-Frontend: `http://localhost:5173`  
-Qdrant: `http://localhost:6333`
+- Backend: `http://localhost:8000`
+- Frontend: `http://localhost:5173`
+- Qdrant: `http://localhost:6333`
+- PostgreSQL: `localhost:5432`
 
 The compose stack runs the backend with `MEMORY_BACKEND=qdrant` and `google-adk` installed, so Qdrant and ADK orchestration are load-bearing in the demo path.
 
-API failures use stable JSON error details: malformed payloads return `malformed_transcript`, dependency outages return `dependency_unavailable`, and provider rate limits return `provider_rate_limited`. Qdrant read/write operations retry briefly before surfacing a dependency failure. The UI uses `POST /v1/transcripts/async` plus `GET /v1/transcripts/jobs/{job_id}` polling so users see queued/processing/completed state instead of waiting on a blank request. Completed and failed transcript jobs expire after `TRANSCRIPT_JOB_TTL_SECONDS`.
+API failures use stable JSON error details: malformed payloads return `malformed_transcript`, dependency outages return `dependency_unavailable`, and provider rate limits return `provider_rate_limited`. Qdrant read/write operations retry briefly before surfacing a dependency failure. The UI uses `POST /v1/transcripts/async` plus `GET /v1/transcripts/jobs/{job_id}` polling so users see queued/processing/completed state instead of waiting on a blank request. Jobs are persisted in PostgreSQL in Docker, with a SQLite fallback for local tests, so completed job history survives backend restarts. Completed and failed transcript jobs expire after `TRANSCRIPT_JOB_TTL_SECONDS`.
+
+The Recall panel includes a `Clear Qdrant` button wired to `POST /v1/admin/qdrant/clear`. It deletes and recreates the configured `decisions`, `action_items`, and `meeting_chunks` collections using the active Qdrant URL/API key from the backend environment. PostgreSQL metadata and job history are intentionally not deleted by this control.
 
 Agent clients can use the same backend through protocol adapters. MCP clients can call `POST /mcp` or `POST /v1/mcp` with `tools/list` and `tools/call`. A2A clients can discover the agent at `GET /.well-known/agent-card.json` and send JSON-RPC messages to `POST /v1/a2a`.
 
@@ -156,7 +161,7 @@ python scripts/fresh_clone_audit.py
 
 ## Known Limitations
 
-The repository currently ships an offline-verifiable MVP plus live Qdrant, ADK, Groq, Deepgram audio ingestion, Lyzr Studio Knowledge Base verification, and optional OTLP tracing adapters. Local tests can still run without cloud credentials by using deterministic fallbacks; the Docker demo uses Qdrant as the active memory backend, MiniLM semantic embeddings, ADK for extraction orchestration, and Groq when `GROQ_API_KEY` is set. Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing remain scoped as stretch work after the core transcript and audio paths.
+The repository currently ships an offline-verifiable MVP plus live Qdrant, PostgreSQL metadata persistence, durable SQLite/Postgres job history, ADK, Groq, Deepgram audio ingestion, Lyzr Studio Knowledge Base verification, and optional OTLP tracing adapters. Local tests can still run without cloud credentials by using deterministic fallbacks; the Docker demo uses Qdrant as the active memory backend, Postgres as the metadata backend, MiniLM semantic embeddings, ADK for extraction orchestration, and Groq when `GROQ_API_KEY` is set. Auth0 RBAC, Slack/email escalation, and full Celery/Redis queueing remain scoped as stretch work after the core transcript and audio paths.
 
 ## Project Structure
 

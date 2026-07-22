@@ -34,6 +34,12 @@ export function getTranscriptJob(jobId) {
   return request(`/v1/transcripts/jobs/${encodeURIComponent(jobId)}`);
 }
 
+export function clearQdrantCollections() {
+  return request("/v1/admin/qdrant/clear", {
+    method: "POST"
+  });
+}
+
 export function searchMemory(query, teamId) {
   const params = new URLSearchParams({ query, team_id: teamId });
   return request(`/v1/memory/search?${params.toString()}`);

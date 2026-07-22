@@ -1,5 +1,6 @@
 import {
   createPreMeetingBrief,
+  clearQdrantCollections,
   getTranscriptJob,
   listConflicts,
   resolveDecisionConflict,
@@ -208,6 +209,21 @@ document.querySelector("#brief").addEventListener("click", async () => {
 });
 
 document.querySelector("#refresh-conflicts").addEventListener("click", refreshConflicts);
+document.querySelector("#clear-qdrant").addEventListener("click", async () => {
+  statusEl.textContent = "Clearing Qdrant";
+  try {
+    await clearQdrantCollections();
+    currentDecisions = [];
+    currentConflicts = [];
+    renderDecisions([]);
+    renderConflicts([]);
+    answerEl.textContent = "";
+    briefEl.textContent = "";
+    statusEl.textContent = "Qdrant cleared";
+  } catch (error) {
+    showError(error);
+  }
+});
 
 async function refreshConflicts() {
   let result;

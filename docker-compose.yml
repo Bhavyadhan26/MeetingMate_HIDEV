@@ -1,4 +1,15 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-meetingmate}
+      POSTGRES_USER: ${POSTGRES_USER:-meetingmate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meetingmate_local}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_storage:/var/lib/postgresql/data
+
   qdrant:
     image: qdrant/qdrant:v1.12.4
     ports:
@@ -16,6 +27,8 @@ services:
       MEMORY_BACKEND: ${MEMORY_BACKEND:-qdrant}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://meetingmate:meetingmate_local@postgres:5432/meetingmate}
+      SQLITE_METADATA_PATH: /workspace/backend/app/persistence/meetingmate.sqlite3
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
@@ -27,6 +40,7 @@ services:
     ports:
       - "8000:8000"
     depends_on:
+      - postgres
       - qdrant
 
   frontend:
@@ -39,4 +53,5 @@ services:
       - backend
 
 volumes:
+  postgres_storage:
   qdrant_storage:

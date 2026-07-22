@@ -3,10 +3,9 @@ from __future__ import annotations
 import os
 import shutil
 import time as _time
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Thread
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -14,6 +13,7 @@ from backend.app.agents.recall_agent import RecallAgent
 from backend.app.memory import get_memory
 from backend.app.memory.vector_store import VectorMemory
 from backend.app.observability import trace_event
+from backend.app.persistence import MetadataStore, get_metadata_store
 from backend.app.services.deepgram import transcribe_audio_file
 from backend.app.services import MeetingPipeline
 from backend.app.services.errors import AppError, DependencyUnavailableError, AuthorizationError, MalformedTranscriptError, classify_processing_error
@@ -21,17 +21,17 @@ from backend.app.services.errors import AppError, DependencyUnavailableError, Au
 _memory: Optional[VectorMemory] = None
 _pipeline: Optional[MeetingPipeline] = None
 _recall: Optional[RecallAgent] = None
-_jobs: Dict[str, Dict[str, Any]] = {}
-_jobs_lock = Lock()
-_executor = ThreadPoolExecutor(max_workers=int(os.getenv("TRANSCRIPT_JOB_WORKERS", "2")))
+_metadata: Optional[MetadataStore] = None
+_worker_started = False
+_worker_lock = Lock()
 _TERMINAL_JOB_STATUSES = {"completed", "failed"}
 _AUDIO_UPLOAD_ROOT = Path(os.getenv("AUDIO_UPLOAD_ROOT", "backend/audio_uploads"))
 _ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg"}
 
 
 def _ensure_initialized() -> None:
-    global _memory, _pipeline, _recall
-    if _memory is not None:
+    global _memory, _pipeline, _recall, _metadata
+    if _memory is not None and _pipeline is not None and _recall is not None and _metadata is not None:
         return
     last_error: Optional[Exception] = None
     for attempt in range(20):
@@ -51,6 +51,24 @@ def _ensure_initialized() -> None:
         ) from last_error
     _pipeline = MeetingPipeline(_memory)
     _recall = RecallAgent(_memory)
+    last_error = None
+    for attempt in range(20):
+        try:
+            _metadata = get_metadata_store()
+            last_error = None
+            break
+        except Exception as exc:
+            last_error = exc
+            if attempt < 19:
+                _time.sleep(1.5)
+    if last_error is not None:
+        _metadata = None
+        raise DependencyUnavailableError(
+            "Metadata store (PostgreSQL/SQLite) is unavailable after 30 seconds. Retry after the service is healthy.",
+            detail={"error": str(last_error)},
+        ) from last_error
+    _metadata.mark_stale_processing_jobs_queued()
+    _start_worker()
 
 
 def process_transcript(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -71,10 +89,9 @@ def enqueue_transcript(payload: Dict[str, Any]) -> Dict[str, Any]:
         "result": None,
         "error": None,
     }
-    with _jobs_lock:
-        _purge_expired_jobs_locked()
-        _jobs[job_id] = job
-    _executor.submit(_run_transcript_job, job_id, dict(payload))
+    _metadata.purge_expired_jobs()
+    _metadata.create_job(job, dict(payload), "transcript")
+    _start_worker()
     return dict(job)
 
 
@@ -109,31 +126,31 @@ def enqueue_audio_transcript(
         "result": None,
         "error": None,
     }
-    with _jobs_lock:
-        _purge_expired_jobs_locked()
-        _jobs[job_id] = job
-    _executor.submit(
-        _run_audio_transcript_job,
-        job_id,
-        audio_path,
-        content_type,
-        {
-            "title": title,
-            "team_id": team_id,
-            "attendees": attendees or [],
-            "agenda": agenda or [],
-        },
+    payload = {
+        "title": title,
+        "team_id": team_id,
+        "attendees": attendees or [],
+        "agenda": agenda or [],
+    }
+    _metadata.purge_expired_jobs()
+    _metadata.create_job(
+        job,
+        payload,
+        "audio",
+        audio_path=str(audio_path),
+        content_type=content_type,
     )
+    _start_worker()
     return dict(job)
 
 
 def get_transcript_job(job_id: str) -> Dict[str, Any]:
-    with _jobs_lock:
-        _purge_expired_jobs_locked()
-        job = _jobs.get(job_id)
-        if not job:
-            return {"error": "Job not found", "job_id": job_id}
-        return dict(job)
+    _ensure_initialized()
+    _metadata.purge_expired_jobs()
+    job = _metadata.get_job(job_id)
+    if not job:
+        return {"error": "Job not found", "job_id": job_id}
+    return _public_job(job)
 
 
 def _process_transcript_payload(payload: Dict[str, Any]) -> Any:
@@ -142,13 +159,15 @@ def _process_transcript_payload(payload: Dict[str, Any]) -> Any:
     attendees = _string_list(payload.get("attendees", []), "attendees")
     agenda = _string_list(payload.get("agenda", []), "agenda")
     try:
-        return _pipeline.process(
+        result = _pipeline.process(
             title=str(payload.get("title", "Untitled meeting")),
             team_id=str(payload.get("team_id", "demo-team")),
             transcript_text=transcript,
             attendees=attendees,
             agenda=agenda,
         )
+        _metadata.save_processing_result(result)
+        return result
     except Exception as exc:
         raise classify_processing_error(exc, "transcript_ingest") from exc
 
@@ -201,9 +220,44 @@ def _finish_job(job_id: str, status: str, result: Any, error: Any) -> None:
 
 
 def _update_job(job_id: str, **fields: Any) -> None:
-    with _jobs_lock:
-        if job_id in _jobs:
-            _jobs[job_id].update(fields)
+    _metadata.update_job(job_id, **fields)
+
+
+def _start_worker() -> None:
+    global _worker_started
+    with _worker_lock:
+        if _worker_started:
+            return
+        Thread(target=_job_worker_loop, name="meetingmate-job-worker", daemon=True).start()
+        _worker_started = True
+
+
+def _job_worker_loop() -> None:
+    while True:
+        try:
+            job = _metadata.next_queued_job() if _metadata else None
+            if not job:
+                _time.sleep(0.5)
+                continue
+            if job["kind"] == "audio":
+                _run_audio_transcript_job(job["job_id"], Path(job["audio_path"]), job.get("content_type"), job["payload"])
+            else:
+                _run_transcript_job(job["job_id"], job["payload"])
+        except Exception as exc:
+            trace_event("job_queue", "worker_error", {"error": str(exc)})
+            _time.sleep(1)
+
+
+def _public_job(job: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "created_at": job["created_at"],
+        "updated_at": job["updated_at"],
+        "expires_at": job.get("expires_at"),
+        "result": job.get("result"),
+        "error": job.get("error"),
+    }
 
 
 def _job_ttl_seconds() -> int:
@@ -215,16 +269,18 @@ def _job_ttl_seconds() -> int:
 
 
 def _purge_expired_jobs_locked(now: datetime | None = None) -> None:
-    current = now or datetime.now(timezone.utc)
-    expired_ids: list[str] = []
-    for job_id, job in _jobs.items():
-        if job.get("status") not in _TERMINAL_JOB_STATUSES:
-            continue
-        expires_at = _parse_datetime(job.get("expires_at"))
-        if expires_at is not None and expires_at <= current:
-            expired_ids.append(job_id)
-    for job_id in expired_ids:
-        del _jobs[job_id]
+    _ensure_initialized()
+    _metadata.purge_expired_jobs()
+
+
+def clear_qdrant_collections() -> Dict[str, Any]:
+    _ensure_initialized()
+    try:
+        _memory.reset()
+    except Exception as exc:
+        raise classify_processing_error(exc, "qdrant_clear") from exc
+    trace_event("qdrant_admin", "clear_collections", {"collections": ["decisions", "action_items", "meeting_chunks"]})
+    return {"status": "cleared", "collections": ["decisions", "action_items", "meeting_chunks"]}
 
 
 def search_memory(query: str, team_id: str = "demo-team") -> Dict[str, Any]:

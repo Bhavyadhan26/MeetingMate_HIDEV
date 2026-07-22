@@ -57,6 +57,22 @@ Vector: embedded from `redacted_text` when present, otherwise `text`. The MVP st
 
 Meeting chunks should be archived after 12 months. Decisions remain active until superseded, conflicted, or resolved. Redaction maps are temporary sensitive data and must be encrypted at rest in production.
 
+## Relational Metadata
+
+`backend/app/persistence/database.py` stores non-vector records in PostgreSQL when `DATABASE_URL` is configured, and in SQLite when running lightweight local tests.
+
+Tables:
+- `meetings`: meeting id, team id, title, attendees JSON, agenda JSON, created timestamp.
+- `redaction_maps`: meeting id, team id, redaction map JSON. In production this is the sensitive table that should use database-level encryption at rest.
+- `transcript_jobs`: durable queue and job history for text/audio transcript processing.
+- `users`, `teams`, `team_memberships`: schema placeholders for auth/RBAC and team structure.
+
+Qdrant remains responsible only for semantic memory: embedded decisions, action items, and meeting chunks.
+
+## Clear Collections
+
+`POST /v1/admin/qdrant/clear` deletes and recreates the active Qdrant collections: `decisions`, `action_items`, and `meeting_chunks`. The frontend exposes this as `Clear Qdrant`. It does not delete PostgreSQL metadata or job history.
+
 ## Live Qdrant Smoke Test
 
 With Qdrant running:

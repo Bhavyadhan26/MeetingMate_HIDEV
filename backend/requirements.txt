@@ -9,3 +9,4 @@ opentelemetry-exporter-otlp==1.31.0
 sentence-transformers==3.3.1
 groq==0.13.1
 python-multipart==0.0.20
+psycopg[binary]==3.2.3

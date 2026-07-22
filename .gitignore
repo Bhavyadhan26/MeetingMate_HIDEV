@@ -29,9 +29,12 @@ build/
 # Logs and local data
 *.log
 qdrant_storage/
+postgres_storage/
 .cache/
 data/
 backend/app/memory/local_ledger.json
+backend/app/persistence/*.sqlite3
+backend/app/persistence/*.sqlite3-*
 backend/app/observability/local_traces.jsonl
 backend/audio_uploads/
 backend/tests/*.wav
