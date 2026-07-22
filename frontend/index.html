@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeetingMate</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      window.MEETINGMATE_API_BASE = window.MEETINGMATE_API_BASE || "http://localhost:8000";
+      window.MEETINGMATE_AUTH0_DOMAIN = window.MEETINGMATE_AUTH0_DOMAIN || "";
+      window.MEETINGMATE_AUTH0_CLIENT_ID = window.MEETINGMATE_AUTH0_CLIENT_ID || "";
+      window.MEETINGMATE_AUTH0_AUDIENCE = window.MEETINGMATE_AUTH0_AUDIENCE || "";
+    </script>
+    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
