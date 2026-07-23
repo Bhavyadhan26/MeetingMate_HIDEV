@@ -57,34 +57,43 @@ export default function ConflictsPage({ appState }) {
   }
 
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <h3>Conflict Audit Center</h3>
-        <div className="inline-actions">
-          <button onClick={() => refresh().catch(() => {})} type="button">Refresh</button>
+    <>
+      <section className="hero-panel compact">
+        <div>
+          <p className="eyebrow">Conflict Resolution Workspace</p>
+          <h3>Resolve contradictory meeting memory before it spreads.</h3>
+          <p>Conflict cards preserve source excerpts, prior-decision links, resolver role, and SLA escalation state.</p>
+        </div>
+        <div className="hero-stack">
           <StatusBadge value={`${conflicts.length} open`} />
-          <span className="muted">24h escalation timeout</span>
+          <span className="status">24h SLA</span>
         </div>
-      </div>
-      <div className="review-row">
-        <input onChange={(event) => setResolver(event.target.value)} value={resolver} />
-        <select onChange={(event) => setResolverRole(event.target.value)} value={resolverRole}>
-          <option value="team_lead">team_lead</option>
-          <option value="decision_owner">decision_owner</option>
-          <option value="admin">admin</option>
-          <option value="observer">observer</option>
-        </select>
-        <input onChange={(event) => setNote(event.target.value)} value={note} />
-      </div>
-      {loading ? <LoadingSpinner label="Loading conflicts" /> : null}
-      {error ? <ErrorState error={error} onRetry={() => refresh().catch(() => {})} /> : null}
-      {!loading && !error && !conflicts.length ? (
-        <EmptyState title="No unresolved conflicts" message="Your decision ledger is healthy." />
-      ) : (
-        <div className="conflict-grid">
-          {conflicts.map((conflict) => <ConflictCard conflict={conflict} key={conflict.id} onResolve={resolve} />)}
+      </section>
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Resolution Controls</h3>
+          <button onClick={() => refresh().catch(() => {})} type="button">Refresh</button>
         </div>
-      )}
-    </section>
+        <div className="review-row">
+          <label>Resolver<input onChange={(event) => setResolver(event.target.value)} value={resolver} /></label>
+          <label>Role<select onChange={(event) => setResolverRole(event.target.value)} value={resolverRole}>
+            <option value="team_lead">team_lead</option>
+            <option value="decision_owner">decision_owner</option>
+            <option value="admin">admin</option>
+            <option value="observer">observer</option>
+          </select></label>
+          <label>Resolution note<input onChange={(event) => setNote(event.target.value)} value={note} /></label>
+        </div>
+        {loading ? <LoadingSpinner label="Loading conflicts" /> : null}
+        {error ? <ErrorState error={error} onRetry={() => refresh().catch(() => {})} /> : null}
+        {!loading && !error && !conflicts.length ? (
+          <EmptyState title="No unresolved conflicts" message="Your decision ledger is healthy." />
+        ) : (
+          <div className="conflict-grid">
+            {conflicts.map((conflict) => <ConflictCard conflict={conflict} key={conflict.id} onResolve={resolve} />)}
+          </div>
+        )}
+      </section>
+    </>
   );
 }

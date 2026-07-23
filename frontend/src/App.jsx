@@ -14,6 +14,7 @@ const DecisionsPage = lazy(() => import("./pages/DecisionsPage.jsx"));
 const MemoryPage = lazy(() => import("./pages/MemoryPage.jsx"));
 const ConflictsPage = lazy(() => import("./pages/ConflictsPage.jsx"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
+const DesignSystemPage = lazy(() => import("./pages/DesignSystemPage.jsx"));
 
 function loadJson(key, fallback) {
   try {
@@ -158,6 +159,7 @@ function AppContent() {
           <Route path="/memory" element={<Suspense fallback={<LoadingSpinner label="Loading memory" />}><MemoryPage appState={appState} /></Suspense>} />
           <Route path="/conflicts" element={<Suspense fallback={<LoadingSpinner label="Loading conflicts" />}><ConflictsPage appState={appState} /></Suspense>} />
           <Route path="/settings" element={<Suspense fallback={<LoadingSpinner label="Loading settings" />}><SettingsPage appState={appState} /></Suspense>} />
+          <Route path="/design-system" element={<Suspense fallback={<LoadingSpinner label="Loading design system" />}><DesignSystemPage appState={appState} /></Suspense>} />
         </Route>
       </Routes>
     </TeamProvider>

@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:sites": "vite build && node scripts/write-sites-worker.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

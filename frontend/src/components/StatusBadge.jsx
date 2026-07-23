@@ -5,5 +5,5 @@ function token(value) {
 }
 
 export const StatusBadge = React.memo(function StatusBadge({ value }) {
-  return <span className={`badge ${token(value)}`}>{value || "unknown"}</span>;
+  return <span className={`badge ${token(value)}`}>{String(value || "unknown").toUpperCase()}</span>;
 });

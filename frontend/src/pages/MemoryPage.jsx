@@ -41,12 +41,17 @@ export default function MemoryPage({ appState }) {
   }
 
   return (
-    <div className="workspace">
-      <section className="panel">
-        <div className="panel-header"><h3>Recall Search</h3></div>
-        <div className="search-row">
+    <>
+      <div className="memory-ledger-layout">
+      <section className="panel memory-query-panel">
+        <div className="memory-command">
+          <span className="material-symbols-outlined">search</span>
           <input onChange={(event) => search.setQuery(event.target.value)} placeholder="Ask anything about past decisions..." value={search.query} />
           <button onClick={runSearch} type="button">Search</button>
+        </div>
+        <div className="filter-strip">
+          {["Date Range", "Team", "Audit Owner", "Integrity Score"].map((filter) => <span key={filter}>{filter}<span className="material-symbols-outlined">expand_more</span></span>)}
+          <small>Team: {teamId}</small>
         </div>
         {search.loading ? <LoadingSpinner label="Searching memory" /> : null}
         {search.error ? <ErrorState error={search.error} onRetry={runSearch} /> : null}
@@ -57,8 +62,30 @@ export default function MemoryPage({ appState }) {
           </div>
         ) : !search.loading && !search.error ? <EmptyState title="Ask a question" message="Search answers include citations to matching decisions." /> : null}
       </section>
-      <section className="panel">
-        <div className="panel-header"><h3>Pre-Meeting Brief</h3></div>
+      <section className="panel ledger-results-panel">
+        <div className="panel-header">
+          <h3>{search.data?.citations?.length || 0} Results Found</h3>
+          <div className="inline-actions ledger-counts">
+            <span><i className="dot active-dot"></i>Active</span>
+            <span><i className="dot warning-dot"></i>Superseded</span>
+            <span><i className="dot conflict-dot"></i>Conflicted</span>
+          </div>
+        </div>
+        <div className="decision-list">
+          {(search.data?.citations || appState.decisions.slice(0, 4)).map((item, index) => (
+            <article className="ledger-result-card" key={item.id || item.decision_id || index}>
+              <div className="ledger-result-top">
+                <h3>{item.text || item.source_excerpt || item.id || "Decision memory item"}</h3>
+                <span className={`badge ${item.status || "active"}`}>{item.status || "active"}</span>
+              </div>
+              <p className="source-quote">{item.source_excerpt || item.text || "Grounded source excerpt appears after recall."}</p>
+              <div className="ledger-tags"><span>#Audit</span><span>#Memory</span><button type="button">VIEW FULL LEDGER <span className="material-symbols-outlined">arrow_forward</span></button></div>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="panel brief-side-panel">
+        <div className="panel-header"><h3>Pre-Meeting Brief Generator</h3></div>
         <div className="search-row">
           <input onChange={(event) => setAgenda(event.target.value)} value={agenda} />
           <button onClick={runBrief} type="button">Generate Brief</button>
@@ -77,6 +104,7 @@ export default function MemoryPage({ appState }) {
           </div>
         ) : !brief.loading && !brief.error ? <EmptyState title="No brief yet" message="Generate a brief to see agenda-specific memory." /> : null}
       </section>
-    </div>
+      </div>
+    </>
   );
 }
